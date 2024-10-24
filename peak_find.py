@@ -45,25 +45,25 @@ def block_average(brightness_array, factor=15):
         - np.ndarray: The reduced array after block averaging.
         - int: The factor used for block averaging.
     """
-
+    
     shape_x, shape_y = brightness_array.shape
 
     factor_x = closest_divisor(shape_x, factor)
     factor_y = closest_divisor(shape_y, factor)
 
-    factor = min(factor_x, factor_y)
+    new_factor = min(factor_x, factor_y)
 
-    if factor != 15:
-        print(f"The factor {factor} was selected because the chosen factor doesn't divide the array dimensions.")
+    if factor_x != factor or factor_y != factor:
+        print(f"Closest divisor used for averaging: factor_x = {factor_x}, factor_y = {factor_y}")
 
-    new_shape = (brightness_array.shape[0] // factor, brightness_array.shape[1] // factor)
+    new_shape = (brightness_array.shape[0] // new_factor, brightness_array.shape[1] // new_factor)
 
-    truncated_array = brightness_array[:new_shape[0] * factor, :new_shape[1] * factor]
+    truncated_array = brightness_array[:new_shape[0] * new_factor, :new_shape[1] * new_factor]
 
-    reshaped = truncated_array.reshape(new_shape[0], factor, new_shape[1], factor)
+    reshaped = truncated_array.reshape(new_shape[0], new_factor, new_shape[1], new_factor)
     reduced_array = reshaped.mean(axis=(1, 3))
 
-    return reduced_array, factor
+    return reduced_array, new_factor
 
 
 

@@ -16,33 +16,50 @@ import matplotlib.pyplot as plt
 
 def bmp_to_brightness_array(image_name):
     """
-    Reads in a bmp image file and asigns each value its intensity value
+    Reads in a bmp image file and assigns each value its intensity value.
+    If a corresponding .npy file exists, it loads the data from there instead.
+    Otherwise, it processes the BMP image and saves the resulting array as .npy.
 
-    parameter:
-        - image_name
+    Parameters:
+        - image_name: The BMP image file name.
 
-    return:
-        - array shape equivalent to the resolution of the image, usually (1920,1080)
-        the intensity values are in between 0 and 255
+    Returns:
+        - np.ndarray: Array with brightness values (0-255) with a shape equivalent to the image resolution.
     """
-    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner"
-    image_path = base_path + image_name
-    img = Image.open(image_path)
-    img = img.convert('RGB')
-
-
-    width, height = img.size
-
-    brightness_array = np.zeros((height, width))
-
-    for y_value in range(height):
-        for x_value in range(width):
-            red, green, blue = img.getpixel((x_value, y_value))
-
-            brightness = (red + green + blue) / 3
-
-            brightness_array[y_value, x_value] = brightness
-
+    
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
+    image_path = os.path.join(base_path, image_name)
+    
+    # Create a .npy file name from the image name (change .bmp to .npy)
+    npy_file_name = image_name.replace('.bmp', '.npy')
+    npy_file_path = os.path.join(base_path, npy_file_name)
+    
+    # Check if the .npy file already exists
+    if os.path.exists(npy_file_path):
+        print(f".npy file found: Loading {npy_file_name}")
+        # Load the array from the .npy file
+        brightness_array = np.load(npy_file_path)
+    else:
+        print(f".npy file not found: Processing {image_name} and saving as {npy_file_name}")
+        # Load and process the BMP file
+        img = Image.open(image_path)
+        img = img.convert('RGB')
+        width, height = img.size
+        
+        # Initialize the brightness array
+        brightness_array = np.zeros((height, width))
+        
+        # Calculate the brightness for each pixel
+        for y_value in range(height):
+            for x_value in range(width):
+                red, green, blue = img.getpixel((x_value, y_value))
+                brightness = (red + green + blue) / 3
+                brightness_array[y_value, x_value] = brightness
+        
+        # Save the brightness array as .npy
+        np.save(npy_file_path, brightness_array)
+        print(f"Brightness array saved as {npy_file_name}")
+    
     return brightness_array
 
 
@@ -100,7 +117,7 @@ def plot_brightness_array(brightness_array, x_limit=None, y_limit=None, save_pat
 
 
 
-def create_c_plot_with_points(data, peaks, mean_values, filename='c_plot.png', colormap='viridis'):
+def create_c_plot_with_points(data, peaks, mean_values=None, filename='c_plot.png', colormap='viridis'):
     """
     Creates a contour plot from a 2D array and puts points on it
 
@@ -123,7 +140,9 @@ def create_c_plot_with_points(data, peaks, mean_values, filename='c_plot.png', c
 
 
     plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=1, label='Punkte')
-    plt.plot(mean_values[:, 0], mean_values[:, 1], 'yo', markersize=1, label='Punkte')
+
+    if mean_values is not None:
+        plt.plot(mean_values[:, 0], mean_values[:, 1], 'yo', markersize=1, label='Punkte')
     plt.legend()
 
     plt.gca().invert_yaxis()

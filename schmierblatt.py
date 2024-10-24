@@ -3,21 +3,20 @@ from peak_find import find_peaks, brightness_subarray_creator, fit_gaussian_3d, 
 #from lpc_indexing import find_outlier_point, analyze_coordinates
 
 
-image_name = '\laser_spots.png'
+image_name_1 = 'tcam_11_image_1.bmp'
+#image_name_2 = '\\tcam_12_image_1.bmp'
+brightness_array_1 = bmp_to_brightness_array(image_name_1)
+#brightness_array_2 = bmp_to_brightness_array(image_name_2)
 
-brightness_array = bmp_to_brightness_array(image_name)
 
-peaks = find_peaks(brightness_array, factor=15)
 
-subarray = brightness_subarray_creator(brightness_array, peaks)
+peaks = find_peaks(brightness_array_1)
 
-mean_values, deviations, fitted_data = fit_gaussian_3d(subarray)
+print(peaks.shape)
 
-laser_point_center = lpc_calc(brightness_array, mean_values, peaks)
+#create_c_plot_with_points(brightness_array_1, peaks)
 
-print(laser_point_center)
 
-create_c_plot_with_points(brightness_array, peaks, laser_point_center, filename='c_plot.png', colormap='viridis')
 
 
 
