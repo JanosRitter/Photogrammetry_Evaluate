@@ -2,7 +2,7 @@
 This module contains all functions to find maximum points in an array. A 2D
 array that contains the intensity of every pixel is analysed. Due to a lot of
 noise the maximum point is not easy to find. The array contains a set number of
-maximums up to 256+1 that are rughly alligned in a cross pattern. The maximums
+maximums up to 256+1 that are roughly alligned in a cross pattern. The maximums
 are first estimated by averaging the array and than fitted using different
 methods to find the laser point centers.
 Current methods available:
@@ -11,7 +11,8 @@ Current methods available:
 
 import numpy as np
 from scipy.optimize import curve_fit
-from file_io import save_array_as_dat
+from file_io import save_array_as_npy
+from scipy.spatial import KDTree
 
 
 
@@ -68,7 +69,7 @@ def block_average(brightness_array, factor=15):
 
 
 
-def find_peaks(brightness_array, factor=15, threshold=40):
+def find_peaks(brightness_array, factor=15, threshold=40, filename='estimated_peak_array.dat'):
     """
     Finds the maximum points in a 7x7 Subarray and applies a threshold to filter noise.
 
@@ -99,47 +100,110 @@ def find_peaks(brightness_array, factor=15, threshold=40):
                     peak_count += 1
 
     file_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner"
-    file_name = r"estimated_peak_array.dat"
+    file_name = filename
 
-    save_array_as_dat(peaks, file_path, file_name)
+    save_array_as_npy(peaks, file_path, file_name)
 
     return peaks[:peak_count]
 
 
 
 
-def find_limit(brightness_array_shape, peaks, max_limits=(60, 60)):
+def peak_filter(points, tolerance=1.5, boundary_factor=2.5):
+    """
+    Removes points that are either outside an automatically detected boundary or 
+    whose distance to their nearest neighbor significantly deviates from the typical distance.
+
+    Parameters:
+        points (np.ndarray): An (n, 2) array of x and y coordinates.
+        tolerance (float): A multiplier for the standard deviation of the distances.
+                           Points with neighbor distances exceeding mean + tolerance * std_dev
+                           are considered outliers and removed.
+        boundary_factor (float): A multiplier for the range around the average location,
+                                 used to define the allowable boundary for points.
+
+    Returns:
+        np.ndarray: A filtered (m, 2) array excluding outliers and points outside the detected boundary.
+    """
+    center = np.mean(points, axis=0)
+    std_dev = np.std(points, axis=0)
+
+    x_bounds = (center[0] - boundary_factor * std_dev[0], center[0] + boundary_factor * std_dev[0])
+    y_bounds = (center[1] - boundary_factor * std_dev[1], center[1] + boundary_factor * std_dev[1])
+
+    within_bounds = (points[:, 0] >= x_bounds[0]) & (points[:, 0] <= x_bounds[1]) & \
+                    (points[:, 1] >= y_bounds[0]) & (points[:, 1] <= y_bounds[1])
+    points_in_bounds = points[within_bounds]
+
+    kdtree = KDTree(points_in_bounds)
+    distances, _ = kdtree.query(points_in_bounds, k=2)
+    nearest_distances = distances[:, 1]
+
+    mean_distance = np.mean(nearest_distances)
+    std_distance = np.std(nearest_distances)
+
+    threshold = mean_distance + tolerance * std_distance
+    mask = nearest_distances <= threshold
+    filtered_peaks = points_in_bounds[mask]
+
+    return filtered_peaks
+
+
+
+
+import numpy as np
+from scipy.spatial import KDTree
+
+def find_limit(brightness_array_shape, peaks, max_limits=(60, 60), distance_factor=0.4):
     """
     Determines the smallest x and y limits that ensure all subarrays around each
-    peak stay within array boundaries, while respecting maximum limits.
+    peak stay within array boundaries, while respecting maximum limits and the
+    distance to the nearest neighboring peak.
 
     Parameters:
     - brightness_array_shape: Shape of the 2D brightness array (height, width).
     - peaks: Array of points [(x1, y1), (x2, y2), ...] for which to calculate the minimum limit.
     - max_limits: (1,2) array specifying maximum limits for (x_limit, y_limit). Default is (60, 60).
+    - distance_factor: The factor (e.g., 0.4) of the distance to the nearest peak to determine limits.
 
     Returns:
     - min_limit: The minimum distance (x_limit, y_limit) that can be used
-    for all peaks without exceeding array boundaries or max_limits.
+    for all peaks without exceeding array boundaries, max_limits, or distance-based limits,
+    rounded and converted to integers.
     """
 
     min_x_limit = float('inf')
     min_y_limit = float('inf')
-
     max_x_limit, max_y_limit = max_limits
 
+    # Build a KDTree for fast nearest-neighbor lookup
+    kdtree = KDTree(peaks)
+    
     for peak in peaks:
         x_center, y_center = peak
 
-        # Calculate the maximum limits based on array boundaries
-        x_max_limit = min(x_center, brightness_array_shape[1] - x_center)
-        y_max_limit = min(y_center, brightness_array_shape[0] - y_center)
+        # Find the distance to the nearest neighbor for this peak
+        distances, indices = kdtree.query([peak], k=2)
+        nearest_distance = distances[0][1]  # Distance to the closest other peak
+        
+        # Calculate limits based on nearest peak distance
+        distance_based_x_limit = nearest_distance * distance_factor
+        distance_based_y_limit = nearest_distance * distance_factor
 
-        # Ensure that the limits don't exceed the specified max_limits
-        min_x_limit = min(min_x_limit, x_max_limit, max_x_limit)
-        min_y_limit = min(min_y_limit, y_max_limit, max_y_limit)
+        # Calculate the maximum allowable limit based on array boundaries
+        x_boundary_limit = min(x_center, brightness_array_shape[1] - x_center)
+        y_boundary_limit = min(y_center, brightness_array_shape[0] - y_center)
 
-    return min_x_limit, min_y_limit
+        # Determine the effective limits, considering distance-based limits, array boundaries, and max limits
+        x_limit = min(distance_based_x_limit, x_boundary_limit, max_x_limit)
+        y_limit = min(distance_based_y_limit, y_boundary_limit, max_y_limit)
+
+        # Update the minimum limits across all peaks
+        min_x_limit = min(min_x_limit, x_limit)
+        min_y_limit = min(min_y_limit, y_limit)
+
+    # Round the limits and convert to integers
+    return int(round(min_x_limit)), int(round(min_y_limit))
 
 
 
@@ -253,30 +317,29 @@ def prepare_meshgrid(width, height):
 
 
 def fit_single_slice(slice_2d, width, height):
-    """
-    Fits a 2D Gaussian to a single slice (2D array) of intensity data.
-
-    Parameters:
-    - slice_2d (np.ndarray): A 2D array of intensity data representing one slice.
-    - width (int): The width of the slice (number of columns).
-    - height (int): The height of the slice (number of rows).
-
-    Returns:
-    - tuple: A tuple containing the fitted parameters ((mu_x, mu_y, sigma_x, sigma_y), amplitude).
-    """
     x_value, y_value = prepare_meshgrid(width, height)
     xy_grid = np.vstack([x_value.ravel(), y_value.ravel()])
 
+    # Sicherstellen, dass die Daten numerisch sind
     xy_grid = np.asarray(xy_grid, dtype=np.float64)
     slice_2d = np.asarray(slice_2d, dtype=np.float64)
 
-    est_mu_x = float(width / 2)
-    est_mu_y = float(height / 2)
-    amp_est = float(slice_2d.max())
-    initial_guess = (float(est_mu_x), float(est_mu_y), float(width / 4), float(height / 4))
+    # Dynamische Schätzung des Mittelpunkts
+    y_max, x_max = np.unravel_index(np.argmax(slice_2d), slice_2d.shape)
+    est_mu_x = float(x_max)
+    est_mu_y = float(y_max)
 
+    # Dynamische Schätzung der Standardabweichungen
+    sigma_x_guess = np.std(slice_2d, axis=1).mean()
+    sigma_y_guess = np.std(slice_2d, axis=0).mean()
+    amp_est = float(slice_2d.max())
+
+    # Initial guess zusammenstellen
+    initial_guess = (est_mu_x, est_mu_y, sigma_x_guess, sigma_y_guess, amp_est)
+
+    # Fitting
     try:
-        p0 = initial_guess + (amp_est,)
+        p0 = initial_guess
         popt, _ = curve_fit(gaussian_2d, xy_grid, slice_2d.ravel(), p0=p0)
         return popt[:4], popt[4]
     except RuntimeError:

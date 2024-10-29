@@ -129,6 +129,10 @@ def create_c_plot_with_points(data, peaks, mean_values=None, filename='c_plot.pn
           (Standard: 'c_plot.png').
         - colormap (str)
     """
+    
+    supported_extension = '.png'
+    if not filename.lower().endswith(supported_extension):
+        filename = os.path.splitext(filename)[0] + supported_extension
 
     plt.figure(figsize=(10, 6))
     contour = plt.contourf(data, cmap=colormap)
@@ -139,38 +143,99 @@ def create_c_plot_with_points(data, peaks, mean_values=None, filename='c_plot.pn
     plt.ylabel('Y-Achse')
 
 
-    plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=1, label='Punkte')
+    plt.plot(peaks[:, 0], peaks[:, 1], 'yo', markersize=0.5, label='Punkte')
 
     if mean_values is not None:
-        plt.plot(mean_values[:, 0], mean_values[:, 1], 'yo', markersize=1, label='Punkte')
+        plt.plot(mean_values[:, 0], mean_values[:, 1], 'ro', markersize=0.5, label='Punkte')
     plt.legend()
 
+    plt.xlim(2460,2490)
+    plt.ylim(1480,1510)
     plt.gca().invert_yaxis()
 
-    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner"
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
     image_path = os.path.join(base_path, filename)
     plt.savefig(image_path, dpi=300, bbox_inches='tight')
     plt.close()
 
     print(f"Konturplot mit Punkten wurde als '{filename}' gespeichert.")
-
-
-
-
-def save_array_as_dat(array, file_path, file_name):
+    
+    
+    
+    
+def create_image_plot(data, peaks, mean_values=None, filename='image_plot.png', colormap='viridis', x_limits=None, y_limits=None):
     """
-    Saves a given NumPy array to a .dat file.
+    Creates an image plot from a 2D array representing pixel brightness and overlays points.
+
+    Parameters:
+        - data (np.ndarray): 2D array with pixel brightness values.
+        - peaks (np.ndarray): (n, 2) array with the estimated laser point centers.
+        - mean_values (np.ndarray): (n, 2) array with calculated laser point centers (optional).
+        - filename (str): The file name where the plot is saved (default: 'image_plot.png').
+        - colormap (str): The colormap used for the image plot.
+        - x_limits (tuple): (min_x, max_x) to set limits on the x-axis (optional).
+        - y_limits (tuple): (min_y, max_y) to set limits on the y-axis (optional).
+    """
+
+    supported_extension = '.png'
+    if not filename.lower().endswith(supported_extension):
+        filename = os.path.splitext(filename)[0] + supported_extension
+
+    plt.figure(figsize=(10, 6))
+    # Use imshow to preserve pixel structure
+    plt.imshow(data, cmap=colormap, interpolation='nearest')
+    plt.colorbar(label='Helligkeit')
+
+    plt.title('Bilddarstellung mit Punkten')
+    plt.xlabel('X-Achse')
+    plt.ylabel('Y-Achse')
+
+    # Plot points
+    plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=1, label='Punkte')
+
+    if mean_values is not None:
+        plt.plot(mean_values[:, 0], mean_values[:, 1], 'yo', markersize=1, label='Mittelwerte')
+    plt.legend()
+
+    # Apply axis limits if provided
+    if x_limits is not None:
+        plt.xlim(x_limits)
+    if y_limits is not None:
+        plt.ylim(y_limits)
+
+    plt.gca().invert_yaxis()
+
+    # Define base path for saving the image
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
+    image_path = os.path.join(base_path, filename)
+    plt.savefig(image_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"Bilddarstellung mit Punkten wurde als '{filename}' gespeichert.")
+
+
+
+
+def save_array_as_npy(array, file_path, file_name):
+    """
+    Saves a given NumPy array to a .npy file.
 
     Parameters:
         - array (np.ndarray): The NumPy array to save.
         - file_path (str): The directory path where the file will be saved.
-        - file_name (str): The name of the .dat file (including extension).
+        - file_name (str): The name of the file (can include any extension; will be saved as .npy).
     """
+    
+    # Ensure the filename has a .npy extension
+    supported_extension = '.npy'
+    if not file_name.lower().endswith(supported_extension):
+        file_name = os.path.splitext(file_name)[0] + supported_extension
 
-    full_path = file_path + "/" + file_name
+    # Construct the full path
+    full_path = os.path.join(file_path, file_name)
 
     try:
-        np.savetxt(full_path, array, delimiter=' ', fmt='%f')
+        np.save(full_path, array)
         print(f"Array saved successfully to {full_path}")
     except OSError as error:
         print(f"OS error occurred: {error}")

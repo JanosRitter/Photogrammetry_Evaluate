@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def triangulate_3D(camera1_data, camera2_data, baseline=0.4, focal_length=1.0, distance=10.0):
+def triangulate_3D(camera1_data, camera2_data, baseline=0.4, focal_length=1.0, distance=6.0):
     """
     Triangulates 3D points from two sets of 2D points obtained from two cameras.
     The system assumes that the laser matrix is projected onto a flat surface with
@@ -80,7 +80,7 @@ def triangulate_3D(camera1_data, camera2_data, baseline=0.4, focal_length=1.0, d
     disparity = np.where(disparity == 0, min_disparity, disparity)
 
     # Calculate Z positions using the disparity and triangulation formula
-    z_positions = baseline * focal_length / disparity
+    z_positions = np.where(disparity > min_disparity, baseline * focal_length / disparity, 0)
 
     # Stack the X, Y, and Z coordinates into a single (n, 3) array
     points_3D = np.vstack((x_positions, y_positions, z_positions)).T
