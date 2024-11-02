@@ -144,44 +144,5 @@ points_3D = triangulate_3D(camera1_data, camera2_data)
 print(points_3D)
 
 
-def plot_3d_points(points_3D, title='3D Scatter Plot', save_as_file=False, filename='3d_points_plot.png'):
-    """
-    Plots 3D points using matplotlib and saves the plot to a file if specified.
 
-    Parameters:
-        - points_3d (np.ndarray): A (n, 3) array containing the 3D coordinates of the points (X, Y, Z).
-        - title (str): The title of the plot.
-        - save_as_file (bool): If True, the plot is saved as a file.
-        - filename (str): The filename for the plot image (if save_as_file is True).
-    """
-    # Create a new figure for the 3D plot
-    fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Extract X, Y, Z coordinates from the input array
-    x_coords = points_3D[:, 0]
-    y_coords = points_3D[:, 1]
-    z_coords = points_3D[:, 2]
-
-    # Scatter plot of the 3D points
-    scatter = ax.scatter(x_coords, y_coords, z_coords, c=z_coords, cmap='viridis', s=50)
-
-    # Add color bar for Z-axis
-    fig.colorbar(scatter, ax=ax, label='Z (Depth)')
-
-    # Set labels and title
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title(title)
-
-    # Optionally save the plot as a file
-    if save_as_file:
-        plt.savefig(filename, dpi=300, bbox_inches='tight')
-        print(f"3D plot saved as '{filename}'")
-
-    # Display the plot
-    plt.show()
-    
-plot_3d_points(points_3D)
 

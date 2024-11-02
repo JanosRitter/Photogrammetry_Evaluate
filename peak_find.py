@@ -10,9 +10,9 @@ Current methods available:
 """
 
 import numpy as np
-from scipy.optimize import curve_fit
-from file_io import save_array_as_npy
 from scipy.spatial import KDTree
+from file_io import save_array_as_npy
+
 
 
 
@@ -46,7 +46,7 @@ def block_average(brightness_array, factor=15):
         - np.ndarray: The reduced array after block averaging.
         - int: The factor used for block averaging.
     """
-    
+
     shape_x, shape_y = brightness_array.shape
 
     factor_x = closest_divisor(shape_x, factor)
@@ -111,99 +111,63 @@ def find_peaks(brightness_array, factor=15, threshold=40, filename='estimated_pe
 
 def peak_filter(points, tolerance=1.5, boundary_factor=2.5):
     """
-    Removes points that are either outside an automatically detected boundary or 
-    whose distance to their nearest neighbor significantly deviates from the typical distance.
+    Filters out points that lie outside an automatically detected boundary or have
+    an unusually large distance to their nearest neighbor.
 
     Parameters:
         points (np.ndarray): An (n, 2) array of x and y coordinates.
-        tolerance (float): A multiplier for the standard deviation of the distances.
-                           Points with neighbor distances exceeding mean + tolerance * std_dev
-                           are considered outliers and removed.
-        boundary_factor (float): A multiplier for the range around the average location,
-                                 used to define the allowable boundary for points.
+        tolerance (float): Multiplier for the standard deviation of distances,
+                           defining outliers based on neighbor distance.
+        boundary_factor (float): Multiplier for the range around the average location,
+                                 defining the allowable boundary for points.
 
     Returns:
-        np.ndarray: A filtered (m, 2) array excluding outliers and points outside the detected boundary.
+        np.ndarray: A filtered (m, 2) array excluding outliers and points outside the
+        detected boundary.
     """
-    center = np.mean(points, axis=0)
-    std_dev = np.std(points, axis=0)
 
-    x_bounds = (center[0] - boundary_factor * std_dev[0], center[0] + boundary_factor * std_dev[0])
-    y_bounds = (center[1] - boundary_factor * std_dev[1], center[1] + boundary_factor * std_dev[1])
+    center, std_dev = np.mean(points, axis=0), np.std(points, axis=0)
+    bounds = [(center[i] - boundary_factor * std_dev[i], center[i] + boundary_factor * std_dev[i]) for i in range(2)]
 
-    within_bounds = (points[:, 0] >= x_bounds[0]) & (points[:, 0] <= x_bounds[1]) & \
-                    (points[:, 1] >= y_bounds[0]) & (points[:, 1] <= y_bounds[1])
-    points_in_bounds = points[within_bounds]
+    in_bounds = (bounds[0][0] <= points[:, 0]) & (points[:, 0] <= bounds[0][1]) & \
+                (bounds[1][0] <= points[:, 1]) & (points[:, 1] <= bounds[1][1])
+    points_in_bounds = points[in_bounds]
 
-    kdtree = KDTree(points_in_bounds)
-    distances, _ = kdtree.query(points_in_bounds, k=2)
-    nearest_distances = distances[:, 1]
+    distances = KDTree(points_in_bounds).query(points_in_bounds, k=2)[0][:, 1]
 
-    mean_distance = np.mean(nearest_distances)
-    std_distance = np.std(nearest_distances)
-
-    threshold = mean_distance + tolerance * std_distance
-    mask = nearest_distances <= threshold
-    filtered_peaks = points_in_bounds[mask]
-
-    return filtered_peaks
+    threshold = np.mean(distances) + tolerance * np.std(distances)
+    return points_in_bounds[distances <= threshold]
 
 
 
-
-import numpy as np
-from scipy.spatial import KDTree
 
 def find_limit(brightness_array_shape, peaks, max_limits=(60, 60), distance_factor=0.4):
     """
-    Determines the smallest x and y limits that ensure all subarrays around each
-    peak stay within array boundaries, while respecting maximum limits and the
-    distance to the nearest neighboring peak.
+    Determines the smallest x and y limits to ensure subarrays around each peak
+    stay within array boundaries, respecting max limits and distances to neighboring peaks.
 
     Parameters:
     - brightness_array_shape: Shape of the 2D brightness array (height, width).
     - peaks: Array of points [(x1, y1), (x2, y2), ...] for which to calculate the minimum limit.
-    - max_limits: (1,2) array specifying maximum limits for (x_limit, y_limit). Default is (60, 60).
-    - distance_factor: The factor (e.g., 0.4) of the distance to the nearest peak to determine limits.
+    - max_limits: Tuple specifying maximum limits for (x_limit, y_limit). Default is (60, 60).
+    - distance_factor: Factor of the distance to the nearest peak to determine limits.
 
     Returns:
-    - min_limit: The minimum distance (x_limit, y_limit) that can be used
-    for all peaks without exceeding array boundaries, max_limits, or distance-based limits,
-    rounded and converted to integers.
+    - min_limit: The minimum distance (x_limit, y_limit) within boundaries, max_limits,
+    and distance-based limits, rounded to integers.
     """
-
-    min_x_limit = float('inf')
-    min_y_limit = float('inf')
-    max_x_limit, max_y_limit = max_limits
-
-    # Build a KDTree for fast nearest-neighbor lookup
+    min_limits = [float('inf'), float('inf')]
     kdtree = KDTree(peaks)
-    
+
     for peak in peaks:
-        x_center, y_center = peak
+        nearest_distance = kdtree.query([peak], k=2)[0][0, 1] * distance_factor
+        boundary_limits = [min(peak[i], brightness_array_shape[i] - peak[i]) for i in range(2)]
 
-        # Find the distance to the nearest neighbor for this peak
-        distances, indices = kdtree.query([peak], k=2)
-        nearest_distance = distances[0][1]  # Distance to the closest other peak
-        
-        # Calculate limits based on nearest peak distance
-        distance_based_x_limit = nearest_distance * distance_factor
-        distance_based_y_limit = nearest_distance * distance_factor
+        limits = [min(nearest_distance, boundary_limits[i], max_limits[i]) for i in range(2)]
 
-        # Calculate the maximum allowable limit based on array boundaries
-        x_boundary_limit = min(x_center, brightness_array_shape[1] - x_center)
-        y_boundary_limit = min(y_center, brightness_array_shape[0] - y_center)
+        min_limits = [min(min_limits[i], limits[i]) for i in range(2)]
 
-        # Determine the effective limits, considering distance-based limits, array boundaries, and max limits
-        x_limit = min(distance_based_x_limit, x_boundary_limit, max_x_limit)
-        y_limit = min(distance_based_y_limit, y_boundary_limit, max_y_limit)
-
-        # Update the minimum limits across all peaks
-        min_x_limit = min(min_x_limit, x_limit)
-        min_y_limit = min(min_y_limit, y_limit)
-
-    # Round the limits and convert to integers
-    return int(round(min_x_limit)), int(round(min_y_limit))
+    return tuple(map(lambda x: int(round(x)), min_limits))
 
 
 
@@ -272,171 +236,3 @@ def lpc_calc(brightness_array, mean_values, peaks):
     laser_point_center = np.round(real_mean_values, decimals=1)
 
     return laser_point_center
-
-
-
-
-def gaussian_2d(xy_grid, mu_x, mu_y, sigma_x, sigma_y, amplitude):
-    """
-    Defines a 2D Gaussian function with separate mean and standard deviation parameters.
-
-    Parameters:
-    - xy_grid (np.ndarray): A tuple of arrays (x, y) representing the grid of coordinates.
-    - mu_x, mu_y (float): Mean values along the x and y axes.
-    - sigma_x, sigma_y (float): Standard deviations along the x and y axes.
-    - amplitude (float): Amplitude of the Gaussian function.
-
-    Returns:
-    - np.ndarray: The Gaussian function evaluated at the given (x, y) coordinates.
-    """
-    x_value, y_value = xy_grid
-    exp_term_x = ((x_value - mu_x) ** 2) / (2 * sigma_x ** 2)
-    exp_term_y = ((y_value - mu_y) ** 2) / (2 * sigma_y ** 2)
-
-    return np.asarray(amplitude * np.exp(-(exp_term_x + exp_term_y)).ravel(), dtype=np.float64)
-
-
-
-
-def prepare_meshgrid(width, height):
-    """
-    Creates a meshgrid of x and y coordinates based on the width and height of the array.
-
-    Parameters:
-    - width (int): The number of columns (x-axis) in the 2D array.
-    - height (int): The number of rows (y-axis) in the 2D array.
-
-    Returns:
-    - np.ndarray, np.ndarray: Two arrays representing the x and y coordinates of the grid.
-    """
-    x_value = np.arange(0, width)
-    y_value = np.arange(0, height)
-    return np.meshgrid(x_value, y_value)
-
-
-
-
-def fit_single_slice(slice_2d, width, height):
-    x_value, y_value = prepare_meshgrid(width, height)
-    xy_grid = np.vstack([x_value.ravel(), y_value.ravel()])
-
-    # Sicherstellen, dass die Daten numerisch sind
-    xy_grid = np.asarray(xy_grid, dtype=np.float64)
-    slice_2d = np.asarray(slice_2d, dtype=np.float64)
-
-    # Dynamische Schätzung des Mittelpunkts
-    y_max, x_max = np.unravel_index(np.argmax(slice_2d), slice_2d.shape)
-    est_mu_x = float(x_max)
-    est_mu_y = float(y_max)
-
-    # Dynamische Schätzung der Standardabweichungen
-    sigma_x_guess = np.std(slice_2d, axis=1).mean()
-    sigma_y_guess = np.std(slice_2d, axis=0).mean()
-    amp_est = float(slice_2d.max())
-
-    # Initial guess zusammenstellen
-    initial_guess = (est_mu_x, est_mu_y, sigma_x_guess, sigma_y_guess, amp_est)
-
-    # Fitting
-    try:
-        p0 = initial_guess
-        popt, _ = curve_fit(gaussian_2d, xy_grid, slice_2d.ravel(), p0=p0)
-        return popt[:4], popt[4]
-    except RuntimeError:
-        return [np.nan] * 4, np.nan
-
-
-
-
-def fit_gaussian_3d(intensity_array):
-    """
-    Applies 2D Gaussian fitting to each slice of a 3D intensity array.
-
-    Parameters:
-    - intensity_array (np.ndarray): A 3D array where each slice (2D) represents intensity data.
-
-    Returns:
-    - np.ndarray: Array of mean values [mu_x, mu_y] for each slice.
-    - np.ndarray: Array of standard deviations [sigma_x, sigma_y] for each slice.
-    - np.ndarray: 3D array of fitted data for each slice, with the same shape as the input array.
-    """
-    num_slices, height, width = intensity_array.shape
-
-    mean_values = np.zeros((num_slices, 2))
-    deviations = np.zeros((num_slices, 2))
-    fitted_data = np.zeros((num_slices, height, width))
-
-    for i in range(num_slices):
-        slice_2d = intensity_array[i]
-        (mu_x, mu_y, sigma_x, sigma_y), amplitude = fit_single_slice(slice_2d, width, height)
-
-        mean_values[i] = [mu_x, mu_y]
-        deviations[i] = [sigma_x, sigma_y]
-
-        if not np.isnan(mu_x):
-            x_value, y_value = prepare_meshgrid(width, height)
-            xy_grid = np.vstack([x_value.ravel(), y_value.ravel()])
-            fitted_slice = gaussian_2d(xy_grid, mu_x, mu_y, sigma_x, sigma_y, amplitude).reshape(height, width)
-            fitted_data[i] = fitted_slice
-        else:
-            fitted_data[i] = np.full((height, width), np.nan)
-
-    return mean_values, deviations, fitted_data
-
-
-
-
-def compute_centroids_with_uncertainty_limited(intensity_array, estimated_positions, max_limits=(60, 60)):
-    """
-    Computes the centroids of laser points and their uncertainties in a given intensity array,
-    with limits on window size around each point.
-
-    Parameters:
-    - intensity_array (np.ndarray): 2D array of intensity values (0-255).
-    - estimated_positions (np.ndarray): (n, 2) array of estimated (x, y) positions of laser points.
-    - max_limits (tuple): Maximum window size for (x_limit, y_limit).
-
-    Returns:
-    - centroids (np.ndarray): (n, 2) array of centroid positions (x, y) for each laser point.
-    - uncertainties (np.ndarray): (n, 2) array of uncertainties (sigma_x, sigma_y) for each centroid.
-    """
-
-    num_points = estimated_positions.shape[0]
-    centroids = np.zeros((num_points, 2))
-    uncertainties = np.zeros((num_points, 2))
-
-    # Find the window size for each point using the find_limit function
-    window_x_limit, window_y_limit = find_limit(intensity_array.shape, estimated_positions, max_limits)
-
-    for i, (x_est, y_est) in enumerate(estimated_positions):
-        # Define the window around the estimated position
-        x_min = max(int(x_est - window_x_limit), 0)
-        x_max = min(int(x_est + window_x_limit), intensity_array.shape[1] - 1)
-        y_min = max(int(y_est - window_y_limit), 0)
-        y_max = min(int(y_est + window_y_limit), intensity_array.shape[0] - 1)
-
-        # Extract the window around the estimated point
-        sub_array = intensity_array[y_min:y_max+1, x_min:x_max+1]
-
-        # Create a grid of x and y positions
-        x_grid, y_grid = np.meshgrid(np.arange(x_min, x_max+1), np.arange(y_min, y_max+1))
-
-        # Calculate the weighted sum of the positions using the intensity as weights
-        total_intensity = np.sum(sub_array)
-
-        if total_intensity > 0:
-            x_centroid = np.sum(x_grid * sub_array) / total_intensity
-            y_centroid = np.sum(y_grid * sub_array) / total_intensity
-
-            # Calculate uncertainty (standard deviation) based on weighted variance
-            x_var = np.sum(((x_grid - x_centroid) ** 2) * sub_array) / total_intensity
-            y_var = np.sum(((y_grid - y_centroid) ** 2) * sub_array) / total_intensity
-
-            centroids[i] = [x_centroid, y_centroid]
-            uncertainties[i] = [np.sqrt(x_var), np.sqrt(y_var)]
-        else:
-            # If no intensity is found, return NaN for the centroid and uncertainty
-            centroids[i] = [np.nan, np.nan]
-            uncertainties[i] = [np.nan, np.nan]
-
-    return centroids, uncertainties

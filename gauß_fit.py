@@ -85,3 +85,61 @@ def fit_gaussian_3d(intensity_array):
 
     return mean_values, deviations, fitted_data
 
+
+
+
+def compute_centroids_with_uncertainty_limited(intensity_array, estimated_positions, max_limits=(60, 60)):
+    """
+    Computes the centroids of laser points and their uncertainties in a given intensity array,
+    with limits on window size around each point.
+
+    Parameters:
+    - intensity_array (np.ndarray): 2D array of intensity values (0-255).
+    - estimated_positions (np.ndarray): (n, 2) array of estimated (x, y) positions of laser points.
+    - max_limits (tuple): Maximum window size for (x_limit, y_limit).
+
+    Returns:
+    - centroids (np.ndarray): (n, 2) array of centroid positions (x, y) for each laser point.
+    - uncertainties (np.ndarray): (n, 2) array of uncertainties (sigma_x, sigma_y) for each centroid.
+    """
+
+    num_points = estimated_positions.shape[0]
+    centroids = np.zeros((num_points, 2))
+    uncertainties = np.zeros((num_points, 2))
+
+    # Find the window size for each point using the find_limit function
+    window_x_limit, window_y_limit = find_limit(intensity_array.shape, estimated_positions, max_limits)
+
+    for i, (x_est, y_est) in enumerate(estimated_positions):
+        # Define the window around the estimated position
+        x_min = max(int(x_est - window_x_limit), 0)
+        x_max = min(int(x_est + window_x_limit), intensity_array.shape[1] - 1)
+        y_min = max(int(y_est - window_y_limit), 0)
+        y_max = min(int(y_est + window_y_limit), intensity_array.shape[0] - 1)
+
+        # Extract the window around the estimated point
+        sub_array = intensity_array[y_min:y_max+1, x_min:x_max+1]
+
+        # Create a grid of x and y positions
+        x_grid, y_grid = np.meshgrid(np.arange(x_min, x_max+1), np.arange(y_min, y_max+1))
+
+        # Calculate the weighted sum of the positions using the intensity as weights
+        total_intensity = np.sum(sub_array)
+
+        if total_intensity > 0:
+            x_centroid = np.sum(x_grid * sub_array) / total_intensity
+            y_centroid = np.sum(y_grid * sub_array) / total_intensity
+
+            # Calculate uncertainty (standard deviation) based on weighted variance
+            x_var = np.sum(((x_grid - x_centroid) ** 2) * sub_array) / total_intensity
+            y_var = np.sum(((y_grid - y_centroid) ** 2) * sub_array) / total_intensity
+
+            centroids[i] = [x_centroid, y_centroid]
+            uncertainties[i] = [np.sqrt(x_var), np.sqrt(y_var)]
+        else:
+            # If no intensity is found, return NaN for the centroid and uncertainty
+            centroids[i] = [np.nan, np.nan]
+            uncertainties[i] = [np.nan, np.nan]
+
+    return centroids, uncertainties
+
