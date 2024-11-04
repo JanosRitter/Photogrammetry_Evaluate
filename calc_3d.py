@@ -2,146 +2,122 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def triangulate_3D(camera1_data, camera2_data, baseline=0.4, focal_length=1.0, distance=6.0):
+
+def calculate_angles(indices):
     """
-    Triangulates 3D points from two sets of 2D points obtained from two cameras.
-    The system assumes that the laser matrix is projected onto a flat surface with
-    the center of the matrix as the origin of the 3D coordinate system.
-
-    The angle between laser points is based on the grid index, with each step corresponding
-    to a 1/6° or 1/3° deviation from the central point (0,0) at the laser origin.
-
+    Berechnet die X- und Y-Winkel basierend auf den Gitterindizes.
+    Der Winkel für den Index (0,0) ist 0, positive Indices folgen 
+    dem Muster: Index * (1/3°) - (1/6°) und negative Indices: 
+    Index * (1/3°) + (1/6°).
+    
     Parameters:
-        - camera1_data (np.ndarray): (n, 4) array with 2D points and their grid indices (x_coord, y_coord, x_index, y_index) for camera 1.
-        - camera2_data (np.ndarray): (n, 4) array with 2D points and their grid indices (x_coord, y_coord, x_index, y_index) for camera 2.
-        - baseline (float): Distance between the two cameras in meters (default is 0.4 meters).
-        - focal_length (float): The focal length of the cameras in meters (default is 1.0 meter).
-        - distance (float): The initial distance from the cameras to the object plane in meters (default is 10 meters).
-
+        - indices (np.ndarray): (n, 2) Array der Indizes (x_index, y_index).
+        
     Returns:
-        - np.ndarray: (n, 3) array of triangulated 3D points (X, Y, Z).
+        - angles_x (np.ndarray): Array der X-Achsen-Winkel in Bogenmaß.
+        - angles_y (np.ndarray): Array der Y-Achsen-Winkel in Bogenmaß.
     """
-    
-    def calculate_angles(indices):
-        """
-        Calculates the X and Y angles based on the grid indices.
-        The central point (0,0) is the reference, with deviations of 1/6° for the first row/column
-        and 1/3° for subsequent rows/columns.
+    angles_x = np.zeros(indices.shape[0])
+    angles_y = np.zeros(indices.shape[0])
+
+    for i, (x_idx, y_idx) in enumerate(indices):
+        if (x_idx, y_idx) == (0, 0):
+            angles_x[i] = 0  # Winkel bei (0, 0) ist 0 Grad
+        else:
+            # Berechnung für X-Winkel
+            angles_x[i] = (x_idx * (1/3) - (1/6)) if x_idx > 0 else (x_idx * (1/3) + (1/6))
         
-        Parameters:
-            - indices (np.ndarray): (n, 2) array of indices (x_index, y_index).
-        
-        Returns:
-            - angles_x (np.ndarray): Array of X-axis angles in radians.
-            - angles_y (np.ndarray): Array of Y-axis angles in radians.
-        """
-        angle_per_index = 1/3  # 1/3° deviation for all indices except the central ones
-        # First row/column deviates by 1/6°
-        near_center_angle = 1/6
+        # Berechnung für Y-Winkel
+        if (y_idx, y_idx) == (0, 0):
+            angles_y[i] = 0  # Winkel bei (0, 0) ist 0 Grad
+        else:
+            angles_y[i] = (y_idx * (1/3) - (1/6)) if y_idx > 0 else (y_idx * (1/3) + (1/6))
 
-        # Calculate angles based on the indices
-        angles_x = np.zeros(indices.shape[0])
-        angles_y = np.zeros(indices.shape[0])
+    # Umrechnung von Grad in Bogenmaß
+    angles_x = np.deg2rad(angles_x)
+    angles_y = np.deg2rad(angles_y)
 
-        for i, (x_idx, y_idx) in enumerate(indices):
-            if abs(x_idx) == 1:  # For the first row/column, use 1/6°
-                angles_x[i] = near_center_angle * np.sign(x_idx)
-            else:
-                angles_x[i] = abs(x_idx) * angle_per_index * np.sign(x_idx)
+    return angles_x, angles_y
 
-            if abs(y_idx) == 1:  # For the first row/column, use 1/6°
-                angles_y[i] = near_center_angle * np.sign(y_idx)
-            else:
-                angles_y[i] = abs(y_idx) * angle_per_index * np.sign(y_idx)
+import numpy as np
 
-        # Convert degrees to radians
-        angles_x = np.deg2rad(angles_x)
-        angles_y = np.deg2rad(angles_y)
-
-        return angles_x, angles_y
-
-    # Get the indices from the camera data
-    indices1 = camera1_data[:, 2:4]
-    indices2 = camera2_data[:, 2:4]
-
-    # Calculate angles for both sets of indices (same for both cameras since it's the same grid)
-    angles_x1, angles_y1 = calculate_angles(indices1)
-    angles_x2, angles_y2 = calculate_angles(indices2)
-
-    # X and Y positions are determined by the angles at the given distance
-    x_positions = distance * np.tan(angles_x1)  # X positions based on angles from camera1
-    y_positions = distance * np.tan(angles_y1)  # Y positions based on angles from camera1
-
-    # Now handle the Z calculation based on the disparity between camera1 and camera2
-    disparity = camera1_data[:, 0] - camera2_data[:, 0]  # Disparity in x-coordinates (pixel difference)
+def triangulate_3D(camera1_data, camera2_data, a=0.2, f=0.04, pixel_size=2.74e-6, resolution=(4096, 3000)):
+    """
+    Berechnet die 3D-Koordinaten der Punkte basierend auf den Bilddaten von zwei Kameras.
     
-    # Prevent divide-by-zero by setting a minimum disparity threshold
-    min_disparity = 1e-6
-    disparity = np.where(disparity == 0, min_disparity, disparity)
+    Parameters:
+        - camera1_data (np.ndarray): Array der Bildpunkte auf Kamera 1 in Pixelkoordinaten (n, 2).
+        - camera2_data (np.ndarray): Array der Bildpunkte auf Kamera 2 in Pixelkoordinaten (n, 2).
+        - a (float): Abstand der Kameras zur Ursprungsebene entlang der x-Achse.
+        - f (float): Brennweite der Kameras.
+        - pixel_size (float): Größe eines Pixels in Metern.
+        - resolution (tuple): Auflösung der Kameras in Pixeln (Breite, Höhe).
+    
+    Returns:
+        - np.ndarray: Array der rekonstruierten 3D-Koordinaten (n, 3).
+    """
+    n_points = camera1_data.shape[0]
+    points_3D = np.zeros((n_points, 3))
 
-    # Calculate Z positions using the disparity and triangulation formula
-    z_positions = np.where(disparity > min_disparity, baseline * focal_length / disparity, 0)
+    # Kamerapositionen
+    cam1_pos = np.array([a, 0, 0])
+    cam2_pos = np.array([-a, 0, 0])
+    
+    # Offset zur Zentrierung auf dem Bild
+    offset_x = resolution[0] / 2
+    offset_y = resolution[1] / 2
+    
+    for i in range(n_points):
+        # Pixelkoordinaten in reale Bildkoordinaten umrechnen
+        x1_img = (camera1_data[i, 0] - offset_x) * pixel_size
+        y1_img = (camera1_data[i, 1] - offset_y) * pixel_size
+        x2_img = (camera2_data[i, 0] - offset_x) * pixel_size
+        y2_img = (camera2_data[i, 1] - offset_y) * pixel_size
 
-    # Stack the X, Y, and Z coordinates into a single (n, 3) array
-    points_3D = np.vstack((x_positions, y_positions, z_positions)).T
+        # Richtungsvektoren für die Geraden von den Kameras zu den Punkten auf der Bildebene
+        dir_cam1 = np.array([x1_img, y1_img, f])
+        dir_cam2 = np.array([x2_img, y2_img, f])
+
+        # Berechne den nächsten Punkt zwischen den beiden Geraden
+        points_3D[i] = find_closest_point(cam1_pos, dir_cam1, cam2_pos, dir_cam2)
 
     return points_3D
 
 
-camera1_data = np.array([
-    [850, 470, -2, -2],   # Punkt links oben
-    [900, 480, -1, -2],   # Punkt daneben (rechts oben)
-    [950, 490,  1, -2],   # Punkt daneben (weiter rechts oben)
-    [1000, 500,  2, -2],  # Punkt rechts oben
-
-    [860, 520, -2, -1],   # Punkt links mitte oben
-    [910, 530, -1, -1],   # Punkt daneben
-    [960, 540,  1, -1],   # Punkt daneben
-    [1010, 550,  2, -1],  # Punkt rechts mitte oben
-
-    [870, 570, -2,  1],   # Punkt links mitte unten
-    [920, 580, -1,  1],   # Punkt daneben
-    [970, 590,  1,  1],   # Punkt daneben
-    [1020, 600,  2,  1],  # Punkt rechts mitte unten
+def find_closest_point(p1, d1, p2, d2):
+    """
+    Findet den nächsten Punkt zwischen zwei Geraden, die durch die Punkte p1 und p2 verlaufen
+    und in die Richtungen d1 und d2 zeigen.
     
-    [880, 620, -2,  2],   # Punkt links unten
-    [930, 630, -1,  2],   # Punkt daneben
-    [980, 640,  1,  2],   # Punkt daneben
-    [1030, 650,  2,  2],  # Punkt rechts unten
-
-    [970, 590,  0,  0]    # Zentraler Punkt (Ursprung)
-])
-
-
-camera2_data = np.array([
-    [830, 460, -2, -2],   # Punkt links oben
-    [880, 470, -1, -2],   # Punkt daneben (rechts oben)
-    [930, 480,  1, -2],   # Punkt daneben (weiter rechts oben)
-    [980, 490,  2, -2],   # Punkt rechts oben
-
-    [840, 510, -2, -1],   # Punkt links mitte oben
-    [890, 520, -1, -1],   # Punkt daneben
-    [940, 530,  1, -1],   # Punkt daneben
-    [990, 540,  2, -1],   # Punkt rechts mitte oben
-
-    [850, 560, -2,  1],   # Punkt links mitte unten
-    [900, 570, -1,  1],   # Punkt daneben
-    [950, 580,  1,  1],   # Punkt daneben
-    [1000, 590,  2,  1],  # Punkt rechts mitte unten
+    Parameters:
+        - p1, p2 (np.ndarray): Ausgangspunkte der beiden Geraden.
+        - d1, d2 (np.ndarray): Richtungsvektoren der beiden Geraden.
     
-    [860, 610, -2,  2],   # Punkt links unten
-    [910, 620, -1,  2],   # Punkt daneben
-    [960, 630,  1,  2],   # Punkt daneben
-    [1010, 640,  2,  2],  # Punkt rechts unten
+    Returns:
+        - np.ndarray: Der nächstgelegene Punkt zwischen den beiden Geraden.
+    """
+    d1 = d1 / np.linalg.norm(d1)  # Normiere Richtungsvektoren
+    d2 = d2 / np.linalg.norm(d2)
+    
+    # Definiere das Gleichungssystem
+    w0 = p1 - p2
+    a = np.dot(d1, d1)
+    b = np.dot(d1, d2)
+    c = np.dot(d2, d2)
+    d = np.dot(d1, w0)
+    e = np.dot(d2, w0)
 
-    [950, 580,  0,  0]    # Zentraler Punkt (Ursprung)
-])
+    # Löse für die Parameter s und t, die die kürzesten Distanzen beschreiben
+    denom = a * c - b * b
+    s = (b * e - c * d) / denom
+    t = (a * e - b * d) / denom
 
+    # Berechne die Punkte auf den beiden Geraden
+    point_on_line1 = p1 + s * d1
+    point_on_line2 = p2 + t * d2
 
-
-points_3D = triangulate_3D(camera1_data, camera2_data)
-
-print(points_3D)
+    # Der Mittelwert der beiden Punkte ergibt den bestmöglichen Schnittpunkt
+    return (point_on_line1 + point_on_line2) / 2
 
 
 

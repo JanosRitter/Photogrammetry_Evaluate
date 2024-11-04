@@ -251,7 +251,7 @@ def plot_3d_points(points_3d, title='3D Scatter Plot', save_as_file=False, filen
 
     scatter = axis.scatter(x_coords, y_coords, z_coords, c=z_coords, cmap='viridis', s=50)
 
-    fig.colorbar(scatter, axis=axis, label='Z (Depth)')
+    fig.colorbar(scatter, ax=axis, label='Z (Depth)')
 
     axis.set_xlabel('X')
     axis.set_ylabel('Y')
