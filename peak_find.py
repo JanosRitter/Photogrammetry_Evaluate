@@ -127,7 +127,7 @@ def peak_filter(points, tolerance=1.5, boundary_factor=2.5):
     """
 
     center, std_dev = np.mean(points, axis=0), np.std(points, axis=0)
-    bounds = [(center[i] - boundary_factor * std_dev[i], center[i] + boundary_factor * std_dev[i]) for i in range(2)]
+    bounds = [(center[i] - boundary_factor * std_dev[i], center[i] + boundary_factor * std_dev[i]) for i in range(2)]  # pylint: disable=line-too-long
 
     in_bounds = (bounds[0][0] <= points[:, 0]) & (points[:, 0] <= bounds[0][1]) & \
                 (bounds[1][0] <= points[:, 1]) & (points[:, 1] <= bounds[1][1])
@@ -141,59 +141,45 @@ def peak_filter(points, tolerance=1.5, boundary_factor=2.5):
 
 
 
-def find_limit(brightness_array_shape, peaks, max_limits=(60, 60), distance_factor=0.4):
+def find_average_distance(peaks, factor=0.5):
     """
-    Determines the smallest x and y limits to ensure subarrays around each peak
-    stay within array boundaries, respecting max limits and distances to neighboring peaks.
+    Berechnet den durchschnittlichen Abstand zwischen den Peaks und multipliziert
+    diesen mit einem Faktor.
 
     Parameters:
-    - brightness_array_shape: Shape of the 2D brightness array (height, width).
-    - peaks: Array of points [(x1, y1), (x2, y2), ...] for which to calculate the minimum limit.
-    - max_limits: Tuple specifying maximum limits for (x_limit, y_limit). Default is (60, 60).
-    - distance_factor: Factor of the distance to the nearest peak to determine limits.
+    - peaks: Array von Koordinaten [(x1, y1), (x2, y2), ...].
+    - factor: Skalierungsfaktor, der den Bereich um jeden Punkt steuert.
 
     Returns:
-    - min_limit: The minimum distance (x_limit, y_limit) within boundaries, max_limits,
-    and distance-based limits, rounded to integers.
+    - limits: Ein festgelegtes (x_limit, y_limit) basierend auf dem durchschnittlichen
+    Abstand der Peaks.
     """
-    min_limits = [float('inf'), float('inf')]
     kdtree = KDTree(peaks)
-
-    for peak in peaks:
-        nearest_distance = kdtree.query([peak], k=2)[0][0, 1] * distance_factor
-        boundary_limits = [min(peak[i], brightness_array_shape[i] - peak[i]) for i in range(2)]
-
-        limits = [min(nearest_distance, boundary_limits[i], max_limits[i]) for i in range(2)]
-
-        min_limits = [min(min_limits[i], limits[i]) for i in range(2)]
-
-    return tuple(map(lambda x: int(round(x)), min_limits))
-
-
-
+    distances, _ = kdtree.query(peaks, k=2)
+    avg_distance = np.mean(distances[:, 1])
+    limits = (int(avg_distance * factor), int(avg_distance * factor))
+    print(f"Berechnete Limits (x_limit, y_limit): {limits}")
+    return limits
 
 def brightness_subarray_creator(brightness_array, peaks):
     """
-    Creates subarrays around each point in `peaks` with a single, globally
-    calculated limit based on array boundaries.
-    Returns a 3D array where each slice is a subarray for one of the points.
+    Erstellt Subarrays um jeden Punkt in `peaks` basierend auf einem festen Limit.
+    Gibt ein 3D-Array zurück, wobei jeder Slice ein Subarray für einen der Punkte ist.
 
     Parameters:
-    - brightness_array: 2D array of brightness values.
-    - peaks: List of points [(x1, y1), (x2, y2), ...].
+    - brightness_array: 2D-Array mit Helligkeitswerten.
+    - peaks: Liste von Punkten [(x1, y1), (x2, y2), ...].
 
     Returns:
-    - A 3D array where each slice corresponds to a subarray for one of the points.
+    - Ein 3D-Array, wobei jeder Slice ein Subarray für einen der Punkte darstellt.
     """
 
-    x_limit, y_limit = find_limit(brightness_array.shape, peaks)
-
+    x_limit, y_limit = find_average_distance(peaks)
 
     subarrays = []
 
     for peak in peaks:
         x_center, y_center = peak
-
 
         x_min = max(x_center - x_limit, 0)
         x_max = min(x_center + x_limit, brightness_array.shape[1])
@@ -201,16 +187,14 @@ def brightness_subarray_creator(brightness_array, peaks):
         y_max = min(y_center + y_limit, brightness_array.shape[0])
 
         brightness_subarray = brightness_array[y_min:y_max, x_min:x_max]
-
         subarrays.append(brightness_subarray)
 
     subarrays_3d = np.array(subarrays, dtype=object)
-
     return subarrays_3d
 
 
 
-def lpc_calc(brightness_array, mean_values, peaks):
+def lpc_calc(mean_values, peaks):
     """
     Calculates the laser point centers from the peaks and mean values
     calculated before hand by the choosen method
@@ -226,7 +210,7 @@ def lpc_calc(brightness_array, mean_values, peaks):
     """
 
 
-    x_limit, y_limit = find_limit(brightness_array.shape, peaks)
+    x_limit, y_limit = find_average_distance(peaks)
 
     real_mean_values = np.zeros(mean_values.shape)
 

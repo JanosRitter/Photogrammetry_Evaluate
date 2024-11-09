@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 from file_io import plot_3d_points
 from lpc_indexing import find_outlier_point, analyze_coordinates
-from calc_3d import triangulate_3D
+from calc_3d import triangulate_3d
 
 def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, rho=0, phi=0):
     """
@@ -215,13 +215,17 @@ def plot_2d_points_pair(points_2d_1, points_2d_2, labels=('Dataset 1', 'Dataset 
 
     
     
-print(cam1_coords)
-print(cam2_coords)
+
 plot_2d_points_pair(cam1_coords, cam2_coords)
 
+camera_stats = {
+    'a': 0.2,                  # Distance from the cameras to the origin plane along the x-axis
+    'f': 0.04,                 # Focal length of the cameras in meters
+    'pixel_size': 2.74e-6,     # Pixel size in meters
+    'resolution': (4096, 3000) # Resolution of the cameras in pixels (width, height)
+}
 
-
-three_d_points = triangulate_3D(cam1_coords, cam2_coords)
+three_d_points = triangulate_3d(cam1_coords, cam2_coords, camera_stats)
 
 plot_3d_points(three_d_points)
 

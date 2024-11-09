@@ -14,6 +14,7 @@ from PIL import Image
 
 
 
+
 def bmp_to_brightness_array(image_name):
     """
     Reads in a bmp image file and assigns each value its intensity value.
@@ -143,8 +144,7 @@ def create_c_plot_with_points(data, peaks, mean=None, filename='c_plot.png', col
         plt.plot(mean[:, 0], mean[:, 1], 'ro', markersize=0.5, label='Punkte')
     plt.legend()
 
-    plt.xlim(2460, 2490)
-    plt.ylim(1480, 1510)
+
     plt.gca().invert_yaxis()
 
     base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
@@ -229,7 +229,7 @@ def save_array_as_npy(array, file_path, file_name):
 
 
 
-def plot_3d_points(points_3d, title='3D Scatter Plot', save_as_file=False, filename='3d_points_plot.png'):
+def plot_3d_points(points_3d, title='3D Scatter Plot', save_as_file=False, filename='3d_points_plot.png'): # pylint: disable=line-too-long
     """
     Plots 3D points using matplotlib and saves the plot to a file if specified.
 

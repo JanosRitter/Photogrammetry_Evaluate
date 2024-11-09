@@ -58,8 +58,8 @@ def calculate_rotation_angle(coords):
     lower_points = nearest_points[nearest_points[:, 1] < outlier_coord[1]]
 
     if len(upper_points) >= 2 and len(lower_points) >= 2:
-        upper_slope = (upper_points[1][1] - upper_points[0][1]) / (upper_points[1][0] - upper_points[0][0])
-        lower_slope = (lower_points[1][1] - lower_points[0][1]) / (lower_points[1][0] - lower_points[0][0])
+        upper_slope = (upper_points[1][1] - upper_points[0][1]) / (upper_points[1][0] - upper_points[0][0])  # pylint: disable=line-too-long
+        lower_slope = (lower_points[1][1] - lower_points[0][1]) / (lower_points[1][0] - lower_points[0][0])  # pylint: disable=line-too-long
     else:
         raise ValueError("Nicht genug Punkte zur Bestimmung der Steigungen.")
 
@@ -151,7 +151,7 @@ def sort_result_by_indices(result):
     Returns:
         - np.ndarray: Sortiertes Array nach Spalte 3 und, falls gleich, nach Spalte 4.
     """
-    # Sortiert zuerst nach Spalte 3 und dann nach Spalte 4 (x- und y-Indizes)
+
     sorted_result = result[np.lexsort((result[:, 3], result[:, 2]))]
     return sorted_result
 
@@ -167,7 +167,7 @@ def analyze_coordinates(laser_point_centers, tolerance=40.0):
         - tolerance (float): Tolerance for merging nearby values into a grid.
 
     Returns:
-        - np.ndarray: Result array with original coordinates and assigned x, y indices, shape (n, 4).
+        - np.ndarray: Result array with original coordinates and assigned x, y indices, shape (n, 4)
     """
     outlier_index = find_outlier_point(laser_point_centers)[1]
 
