@@ -15,47 +15,55 @@ from PIL import Image
 
 
 
-def bmp_to_brightness_array(image_name):
+def load_brightness_arrays(folder_name):
     """
-    Reads in a bmp image file and assigns each value its intensity value.
-    If a corresponding .npy file exists, it loads the data from there instead.
-    Otherwise, it processes the BMP image and saves the resulting array as .npy.
+    Reads BMP image files in a specified folder, ensuring exactly two are present,
+    and converts each to a brightness array. Loads from existing .npy files if available.
 
     Parameters:
-        - image_name: The BMP image file name.
+        - folder_name: Name of the final directory containing the BMP files.
 
     Returns:
-        - np.ndarray: Array with brightness values (0-255) with a shape equivalent
-        to the image resolution.
+        - brightness_array_1, brightness_array_2: Two np.ndarrays with brightness values (0-255).
+
+    Raises:
+        - ValueError: If there are not exactly two BMP files in the folder.
     """
 
-    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
-    image_path = os.path.join(base_path, image_name)
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input"
+    folder_path = os.path.join(base_path, folder_name)
+    bmp_files = sorted([file for file in os.listdir(folder_path) if file.lower().endswith('.bmp')])
 
-    npy_file_name = image_name.replace('.bmp', '.npy')
-    npy_file_path = os.path.join(base_path, npy_file_name)
+    if len(bmp_files) != 2:
+        raise ValueError(f"Expected exactly 2 BMP files, but found {len(bmp_files)}.")
 
-    if os.path.exists(npy_file_path):
-        print(f".npy file found: Loading {npy_file_name}")
-        brightness_array = np.load(npy_file_path)
-    else:
-        print(f".npy file not found: Processing {image_name} and saving as {npy_file_name}")
-        img = Image.open(image_path)
-        img = img.convert('RGB')
-        width, height = img.size
+    brightness_arrays = []
 
-        brightness_array = np.zeros((height, width))
+    for bmp_file in bmp_files:
+        bmp_path = os.path.join(folder_path, bmp_file)
+        npy_file_path = os.path.join(folder_path, bmp_file.replace('.bmp', '.npy'))
 
-        for y_value in range(height):
-            for x_value in range(width):
-                red, green, blue = img.getpixel((x_value, y_value))
-                brightness = (red + green + blue) / 3
-                brightness_array[y_value, x_value] = brightness
+        if os.path.exists(npy_file_path):
+            print(f".npy file found: Loading {npy_file_path}")
+            brightness_array = np.load(npy_file_path)
+        else:
+            print(f".npy file not found: Processing {bmp_file} and saving as {npy_file_path}")
+            img = Image.open(bmp_path).convert('RGB')
+            width, height = img.size
+            brightness_array = np.zeros((height, width), dtype=np.uint8)
 
-        np.save(npy_file_path, brightness_array)
-        print(f"Brightness array saved as {npy_file_name}")
+            for y_value in range(height):
+                for x_value in range(width):
+                    red, green, blue = img.getpixel((x_value, y_value))
+                    brightness = (red + green + blue) / 3
+                    brightness_array[y_value, x_value] = brightness
 
-    return brightness_array
+            np.save(npy_file_path, brightness_array)
+            print(f"Brightness array saved as {npy_file_path}")
+
+        brightness_arrays.append(brightness_array)
+
+    return brightness_arrays[0], brightness_arrays[1]
 
 
 
@@ -102,7 +110,7 @@ def plot_brightness_array(brightness_array, x_limit=None, y_limit=None, save_pat
 
     if save_path:
         try:
-            plt.savefig(save_path, format='png', dpi=300)  # Format und DPI anpassen
+            plt.savefig(save_path, format='png', dpi=300)
             print(f"Plot gespeichert unter: {save_path}")
         except PermissionError as error:
             print(f"PermissionError: {error}")
@@ -114,50 +122,78 @@ def plot_brightness_array(brightness_array, x_limit=None, y_limit=None, save_pat
 
 def create_c_plot_with_points(data, peaks, mean=None, filename='c_plot.png', colormap='viridis'):
     """
-    Creates a contour plot from a 2D array and puts points on it
+    Creates a contour plot from a 2D array and overlays points representing peaks and optionally mean values.
+    Saves the plot to a specified location, creating the directory if it does not exist.
 
     Parameters:
-        - data (np.ndarray): 2D array with data for the contour plot
-        - points (np.ndarray): (n, 2) array with an estimation of the laser point centers
-        - mean_values: (n, 2) array with calculated laser point centers
-        - filename (str): The file name where the plot is saved
-          (Standard: 'c_plot.png').
-        - colormap (str)
+        - data (np.ndarray): 2D array for the contour plot.
+        - peaks (np.ndarray): (n, 2) array with coordinates for peak points.
+        - mean (np.ndarray, optional): (n, 2) array with coordinates for mean points.
+        - filename (str): Filename to save the plot (default: 'c_plot.png').
+        - colormap (str): Colormap to use in the plot (default: 'viridis').
     """
+    if not filename.lower().endswith('.png'):
+        filename = os.path.splitext(filename)[0] + '.png'
 
-    supported_extension = '.png'
-    if not filename.lower().endswith(supported_extension):
-        filename = os.path.splitext(filename)[0] + supported_extension
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output"
+    os.makedirs(base_path, exist_ok=True)
+    image_path = os.path.join(base_path, filename)
 
     plt.figure(figsize=(10, 6))
     contour = plt.contourf(data, cmap=colormap)
     plt.colorbar(contour)
+    plt.title('Contour Plot with Points')
+    plt.xlabel('X Axis')
+    plt.ylabel('Y Axis')
+    
+    plt.xlim(300, 1300)
+    plt.ylim(300, 1300)
 
-    plt.title('Konturplot mit Punkten')
-    plt.xlabel('X-Achse')
-    plt.ylabel('Y-Achse')
-
-
-    plt.plot(peaks[:, 0], peaks[:, 1], 'yo', markersize=0.5, label='Punkte')
-
+    plt.plot(peaks[:, 0], peaks[:, 1], 'yo', markersize=1, label='Peaks')
     if mean is not None:
-        plt.plot(mean[:, 0], mean[:, 1], 'ro', markersize=0.5, label='Punkte')
+        plt.plot(mean[:, 0], mean[:, 1], 'ro', markersize=1, label='Mean Points')
     plt.legend()
-
-
     plt.gca().invert_yaxis()
 
-    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
-    image_path = os.path.join(base_path, filename)
     plt.savefig(image_path, dpi=300, bbox_inches='tight')
     plt.close()
 
-    print(f"Konturplot mit Punkten wurde als '{filename}' gespeichert.")
+    print(f"Contour plot with points saved as '{filename}' in '{base_path}'.")
 
 
 
 
-def create_image_plot(data, peaks, mean_values=None, filename='image_plot.png', colormap='viridis'):
+def create_contour_plot(file_path, file_name):
+    """
+    Generates a contour plot from a .npy file with values representing z-coordinates. 
+    The x and y axes reflect the shape of the array.
+    
+    Parameters:
+        file_path (str): Directory path where the .npy file is located.
+        file_name (str): Name of the .npy file (without the extension).
+    
+    Returns:
+        None: Saves the contour plot as a .png file in the same directory as the input file.
+    """
+    data = np.load(os.path.join(file_path, file_name + '.npy'))
+    
+    x = np.arange(data.shape[1])
+    y = np.arange(data.shape[0])
+    
+    plt.contourf(x, y, data, levels=20, cmap='viridis')
+    plt.colorbar(label='Z-Axis Value')
+    plt.xlabel('X-Resolution')
+    plt.ylabel('Y-Resolution')
+    
+    output_path = os.path.join(file_path, file_name + '_contour.png')
+    plt.savefig(output_path, format='png', dpi=300)
+    plt.close()
+    
+
+
+
+
+def create_image_plot(data, peaks=None, mean_values=None, filename='image_plot.png', colormap='viridis'):
     """
     Creates an image plot from a 2D array representing pixel brightness and overlays points.
 
@@ -177,22 +213,25 @@ def create_image_plot(data, peaks, mean_values=None, filename='image_plot.png', 
 
     plt.figure(figsize=(10, 6))
     plt.imshow(data, cmap=colormap, interpolation='nearest')
-    plt.colorbar(label='Helligkeit')
+    plt.colorbar()#label='Helligkeit'
 
-    plt.title('Bilddarstellung mit Punkten')
+    #plt.title('Bilddarstellung mit Punkten')
     plt.xlabel('X-Achse')
-    plt.ylabel('Y-Achse')
-
-    plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=1, label='Punkte')
+    #plt.ylabel('Y-Achse')
+    
+    if peaks is not None:
+        plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=5, label='Punkte')
 
     if mean_values is not None:
-        plt.plot(mean_values[:, 0], mean_values[:, 1], 'yo', markersize=1, label='Mittelwerte')
+        plt.plot(mean_values[:, 0], mean_values[:, 1], 'bo', markersize=5, label='Mittelwerte')
     plt.legend()
 
+    plt.xlim(1820,1850)
+    plt.ylim(1020,1055)
 
     plt.gca().invert_yaxis()
 
-    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\example_images"
+    base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output"
     image_path = os.path.join(base_path, filename)
     plt.savefig(image_path, dpi=300, bbox_inches='tight')
     plt.close()
@@ -264,4 +303,21 @@ def plot_3d_points(points_3d, title='3D Scatter Plot', save_as_file=False, filen
         print(f"3D plot saved as '{filename}'")
 
     plt.show()
+    
+    
+    
+    
+def load_npy_file(filepath, filename):
+    """
+    Loads a .npy file and returns its contents as a numpy array.
+
+    Parameters:
+    - filepath (str): The path to the directory containing the .npy file.
+    - filename (str): The name of the .npy file to be loaded.
+
+    Returns:
+    - np.ndarray: Array containing the data from the .npy file.
+    """
+    full_path = os.path.join(filepath, filename)
+    return np.load(full_path)
         

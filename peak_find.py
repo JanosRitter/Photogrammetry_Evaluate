@@ -16,7 +16,7 @@ from file_io import save_array_as_npy
 
 
 
-
+  
 def closest_divisor(shape, factor):
     """
     Find the divisor of n that is closest to the given factor.
@@ -175,6 +175,7 @@ def brightness_subarray_creator(brightness_array, peaks):
     """
 
     x_limit, y_limit = find_average_distance(peaks)
+    
 
     subarrays = []
 

@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from file_io import plot_3d_points
 from lpc_indexing import find_outlier_point, analyze_coordinates
 from calc_3d import triangulate_3d
 
-def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, rho=0, phi=0):
+def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0, 0)):
     """
     Generates a matrix of laser points projected onto a rotated plane in 3D space.
 
@@ -22,6 +23,8 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, rho=0, ph
     - np.ndarray: Array of shape ((2n)^2 + 1, 3) containing the (x, y, z) coordinates
                   of the laser points projected onto the rotated plane.
     """
+    
+    rho, phi = angle
     if beta is None:
         beta = alpha
 
@@ -85,18 +88,17 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, rho=0, ph
 d = 10.0
 n = 8
 alpha = 1/3
-rho = 45
-phi = 0
-points = generate_laser_projection_on_rotated_plane(d, n, alpha, rho=rho, phi=phi)
+angle= (30,30)
+points = generate_laser_projection_on_rotated_plane(d, n, alpha, angle=angle)
 print(points)
 
 
 plot_3d_points(points)
 
 
-def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, resolution=(4096, 3000)):
+def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, resolution=(4096, 3000), angle=angle):
     """
-    Projects laser points onto two camera screens, providing pixel coordinates.
+    Projects laser points onto two camera screens, providing pixel coordinates, and saves the results with a filename including angles.
 
     Parameters:
     - laser_points (np.ndarray): Array of shape (n, 3) containing the (x, y, z) coordinates of laser points.
@@ -104,39 +106,46 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
     - f (float): Focal length of the cameras (default is 0.04 m).
     - pixel_size (float): Size of each pixel in meters (default is 2.74 µm).
     - resolution (tuple): Resolution of the cameras in pixels (default is (4096, 3000)).
+    - angle (tuple): Tuple containing rho and phi angles in degrees for labeling.
+    - save_path (str): Path where the output .npy files will be saved. Default is the current directory.
 
     Returns:
-    - np.ndarray: Two arrays of shape (n, 2), representing the pixel (x, y) coordinates for each laser point
-                  on each camera.
+    - np.ndarray: Two arrays of shape (n, 2), representing the pixel (x, y) coordinates for each laser point on each camera.
     """
+    save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\simulated_data"
+    
+    rho, phi = angle
     n_points = laser_points.shape[0]
-    cam1_coords = np.zeros((n_points, 2))  # Camera on the right side (a, 0, 0)
-    cam2_coords = np.zeros((n_points, 2))  # Camera on the left side (-a, 0, 0)
+    cam1_coords = np.zeros((n_points, 2))
+    cam2_coords = np.zeros((n_points, 2))
 
-    # Camera center points
     cam1_position = np.array([a, 0, 0])
     cam2_position = np.array([-a, 0, 0])
 
-    # Loop through each laser point and calculate projection
     for i, point in enumerate(laser_points):
-        # Vector from camera to laser point
         vec_cam1 = point - cam1_position
         vec_cam2 = point - cam2_position
 
-        # Find intersection with camera screen at z = f
-        # Intersection parameter t = (f - cam_z) / vec_z for each camera
         t_cam1 = f / vec_cam1[2]
         t_cam2 = f / vec_cam2[2]
 
-        # Calculate the intersection point on the camera screens
         intersect_cam1 = cam1_position + t_cam1 * vec_cam1
         intersect_cam2 = cam2_position + t_cam2 * vec_cam2
 
-        # Adjust x-coordinates by subtracting camera position, then convert to pixel coordinates
         cam1_coords[i, 0] = (intersect_cam1[0] - a) / pixel_size + resolution[0] / 2
         cam1_coords[i, 1] = intersect_cam1[1] / pixel_size + resolution[1] / 2
         cam2_coords[i, 0] = (intersect_cam2[0] + a) / pixel_size + resolution[0] / 2
         cam2_coords[i, 1] = intersect_cam2[1] / pixel_size + resolution[1] / 2
+
+    
+
+    cam1_filename = f"projection_rho_{rho}_phi_{phi}_cam1.npy"
+    cam2_filename = f"projection_rho_{rho}_phi_{phi}_cam2.npy"
+
+    np.save(os.path.join(save_path, cam1_filename), cam1_coords)
+    np.save(os.path.join(save_path, cam2_filename), cam2_coords)
+
+    print(f"Data saved as '{cam1_filename}' and '{cam2_filename}' in {save_path}")
 
     return cam1_coords, cam2_coords
 
