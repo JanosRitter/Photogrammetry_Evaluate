@@ -9,10 +9,11 @@ def gaussian_2d_model(xy, mu_x, mu_y, sigma_x, sigma_y, amplitude):
                                 ((y - mu_y) ** 2) / (2 * sigma_y ** 2)))
 
 def gaussian_2d_residuals(params, xy, slice_2d):
-    """Calculates residuals for 2D Gaussian fitting."""
     mu_x, mu_y, sigma_x, sigma_y, amplitude = params
     model = gaussian_2d_model(xy, mu_x, mu_y, sigma_x, sigma_y, amplitude)
-    return np.sum((model - slice_2d.ravel()) ** 2)
+    residuals = (model - slice_2d.ravel()) ** 2
+    weights = slice_2d.ravel()  # Höhere Intensitäten stärker gewichten
+    return np.sum(residuals * weights)
 
 def prepare_meshgrid(width, height):
     """Creates a meshgrid for given width and height dimensions."""

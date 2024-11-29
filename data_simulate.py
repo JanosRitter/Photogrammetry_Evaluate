@@ -5,6 +5,7 @@ import os
 from file_io import plot_3d_points
 from lpc_indexing import find_outlier_point, analyze_coordinates
 from calc_3d import triangulate_3d
+from mpl_toolkits.mplot3d import Axes3D
 
 def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0, 0)):
     """
@@ -88,9 +89,9 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0,
 d = 10.0
 n = 8
 alpha = 1/3
-angle= (30,30)
+angle= (0,0)
 points = generate_laser_projection_on_rotated_plane(d, n, alpha, angle=angle)
-print(points)
+print(points.shape)
 
 
 plot_3d_points(points)
@@ -153,48 +154,9 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
 cam1_coords, cam2_coords = project_points_to_cameras(points)
 
 
-def subtract_coordinate(points_2d):
-    """
-    Subtracts a given (x, y) coordinate from each point in a 2D points array.
 
-    Parameters:
-    - points_2d (np.ndarray): A (n, 2) array of 2D points.
-    - coordinate (tuple): A tuple (x, y) representing the coordinate to subtract.
 
-    Returns:
-    - np.ndarray: A new (n, 2) array with the coordinate subtracted from each point.
-    """
-    coordinate = find_outlier_point(points_2d)[0]
-    return points_2d - np.array(coordinate)
 
-#cam1_coords = subtract_coordinate(cam1_coords)
-cam1_coords= analyze_coordinates(cam1_coords, tolerance=29.0)
-#cam2_coords = subtract_coordinate(cam2_coords)
-cam2_coords= analyze_coordinates(cam2_coords, tolerance=29.0)
-
-def plot_2d_points(points_2d, title='2D Scatter Plot'):
-    """
-    Plots a 2D array of points using matplotlib.
-
-    Parameters:
-    - points_2d (np.ndarray): A (n, 2) array containing the 2D coordinates (x, y) of the points.
-    - title (str): The title of the plot.
-    """
-    x_coords = points_2d[:, 0]
-    y_coords = points_2d[:, 1]
-
-    plt.figure(figsize=(8, 6))
-    plt.scatter(x_coords, y_coords, c='blue', marker='o', s=30, alpha=0.7)
-    
-    plt.xlim(0,4096)
-    plt.ylim(0,3000)
-
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title(title)
-    plt.grid(True)
-    plt.axis('equal')
-    plt.show()
     
     
 def plot_2d_points_pair(points_2d_1, points_2d_2, labels=('Dataset 1', 'Dataset 2'), title='2D Scatter Plot of Two Datasets'):
@@ -243,13 +205,43 @@ plot_3d_points(three_d_points)
 #print(cam1_coords)
 
 
+def plot_coordinates(coordinates, save_path):
+    """
+    Plots (x, y) coordinates from an (n, 2) array and saves the plot to a given path.
+
+    Parameters:
+        - coordinates (np.ndarray): A (n, 2) array with x and y values.
+        - save_path (str): Path where the plot image should be saved.
+    """
+    if not isinstance(coordinates, (list, tuple, np.ndarray)):
+        raise ValueError("The coordinates must be a list, tuple, or numpy array.")
+
+    if len(coordinates) == 0 or len(coordinates[0]) != 2:
+        raise ValueError("The input array must have shape (n, 2).")
+
+    # Create directories if they don't exist
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+    # Plot the coordinates
+    plt.figure(figsize=(8, 6))
+    plt.plot(coordinates[:, 0], coordinates[:, 1], 'rx', label='Coordinates')
+    plt.xlabel("X")
+    plt.ylabel("Y")
+    plt.title("Plot of Coordinates")
+    plt.grid(True)
+    plt.xlim(0,4096)
+    plt.ylim(0,3000)
+
+    # Save the plot
+    plt.savefig(save_path, format='png', dpi=300)
+    plt.close()
+    print(f"Plot saved at: {save_path}")
 
 
 
+save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\cam2.png"
 
-
-
-
+plot_coordinates(cam2_coords, save_path)
 
 
 

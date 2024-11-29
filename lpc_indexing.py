@@ -100,44 +100,61 @@ def rotate_coordinates(coords):
 
 
 
-def unique_with_tolerance(laser_point_centers, tolerance=40):
+def compute_grid_size(coords, k=3):
     """
-    Extracts unique values with a tolerance to merge nearby values.
+    Computes the typical grid size for a nearly square grid by analyzing the median 
+    distance to the k nearest neighbors, excluding the identified outlier.
 
     Parameters:
-        - values (np.ndarray): Input array of values.
-        - tolerance (float): Tolerance for merging nearby values.
+        coords (np.ndarray): Array of shape (n, 2) representing 2D coordinates.
+        k (int): Number of nearest neighbors to consider.
 
     Returns:
-        - np.ndarray: Array of unique values.
+        float: The computed grid size, representing the typical distance between points.
     """
-    unique_vals = []
-    for value in np.sort(laser_point_centers):
-        if not unique_vals or abs(value - unique_vals[-1]) > tolerance:
-            unique_vals.append(value)
-    return np.array(unique_vals)
+    _, outlier_idx = find_outlier_point(coords, k)
+    coords_wo_outlier = np.delete(coords, outlier_idx, axis=0)
+    distances = squareform(pdist(coords_wo_outlier))
+    np.fill_diagonal(distances, np.inf)
+    k_smallest_distances = np.sort(distances, axis=1)[:, :k]
+    grid_size = np.median(np.mean(k_smallest_distances, axis=1))
+    
+    print(f"Computed grid size: {grid_size}")  # Hier wird die berechnete Grid-Größe ausgegeben.
+    
+    return grid_size
 
-def assign_indices(laser_point_centers, tolerance=40):
+
+def assign_grid_indices(coords, k=3):
     """
-    Assigns indices to points based on their proximity to unique values.
+    Assigns grid indices to points based on a grid where the outlier is positioned 
+    at the corner of four central cells, forming a chessboard-like grid.
 
     Parameters:
-        - points (np.ndarray): Input array of points.
-        - unique_vals (np.ndarray): Unique values array for comparison.
-        - tolerance (float): Tolerance for index assignment.
+        coords (np.ndarray): Array of shape (n, 2) representing 2D coordinates.
+        k (int): Number of nearest neighbors to consider for outlier detection 
+                 and grid size computation.
 
     Returns:
-        - np.ndarray: Array of assigned indices.
+        np.ndarray: Array of shape (n, 4) where each row contains:
+            - Original x-coordinate
+            - Original y-coordinate
+            - x-index in the grid
+            - y-index in the grid
     """
-    unique_vals = unique_with_tolerance(laser_point_centers, tolerance=40)
-    indices = np.zeros(len(laser_point_centers), dtype=int)
-    for i, val in enumerate(laser_point_centers):
-        for j, u_val in enumerate(unique_vals):
-            if abs(val - u_val) <= tolerance:
-                indices[i] = j
-                break
-    return indices
+    _, outlier_idx = find_outlier_point(coords, k)
+    grid_size = compute_grid_size(coords, k)
+    origin = coords[outlier_idx]
 
+    # Shift all points relative to the outlier point
+    relative_positions = coords - origin
+
+    # Compute grid indices using custom rounding logic
+    grid_indices = custom_round(relative_positions / grid_size)
+
+    # Assign (0, 0) specifically to the outlier
+    grid_indices[outlier_idx] = [0, 0]
+
+    return np.hstack((coords, grid_indices))
 
 
 
@@ -157,28 +174,54 @@ def sort_result_by_indices(result):
 
 
 
-
-def analyze_coordinates(laser_point_centers, tolerance=40.0):
+def check_unique_indices(indices):
     """
-    Analyzes the input coordinates to assign indices based on a nearly square grid.
+    Checks whether all assigned indices are unique.
 
     Parameters:
-        - data (np.ndarray): Input array of coordinates, shape (n, 2).
-        - tolerance (float): Tolerance for merging nearby values into a grid.
+        indices (np.ndarray): Array of shape (n, 2) containing grid indices.
 
     Returns:
-        - np.ndarray: Result array with original coordinates and assigned x, y indices, shape (n, 4)
+        bool: True if all indices are unique, False otherwise.
     """
-    outlier_index = find_outlier_point(laser_point_centers)[1]
+    unique_indices = {tuple(idx) for idx in indices}
+    return len(unique_indices) == len(indices)
 
-    x_indices = assign_indices(laser_point_centers[:, 0], tolerance)
-    y_indices = assign_indices(laser_point_centers[:, 1], tolerance)
 
-    x_indices -= x_indices[outlier_index]
-    y_indices -= y_indices[outlier_index]
 
-    result = np.hstack((laser_point_centers, x_indices[:, np.newaxis], y_indices[:, np.newaxis]))
+def custom_round(values):
+    """
+    Custom rounding logic:
+    - Negative values are rounded to the next smaller integer (further from zero).
+    - Positive values are rounded to the next larger integer (further from zero).
 
-    sorted_result = sort_result_by_indices(result)
+    Parameters:
+        values (np.ndarray): Array of floating-point values.
 
-    return sorted_result
+    Returns:
+        np.ndarray: Array of integers rounded according to the specified logic.
+    """
+    return np.where(values < 0, np.floor(values), np.ceil(values)).astype(int)
+
+
+def analyze_coordinates(coords, k=3):
+    """
+    Analyzes a set of 2D coordinates and assigns grid-based indices, identifying 
+    an outlier point as the grid origin. Ensures proper alignment and validates index uniqueness.
+
+    Parameters:
+        coords (np.ndarray): Array of shape (n, 2) representing 2D coordinates.
+        k (int): Number of nearest neighbors to consider for outlier detection 
+                 and grid size computation.
+
+    Returns:
+        np.ndarray: Sorted array of shape (n, 4), where each row contains:
+            - Original x-coordinate
+            - Original y-coordinate
+            - x-index in the grid
+            - y-index in the grid
+    """
+    result = assign_grid_indices(coords, k)
+    if not check_unique_indices(result[:, 2:].astype(int)):
+        print("Warning: Assigned indices are not unique!")
+    return sort_result_by_indices(result)
