@@ -1,8 +1,11 @@
 """
 This module contains different plotting routines for contour, 2D and 3D plots
 """
+import os
+os.chdir('C:/Users/Janos/Documents/Masterarbeit/3D_scanner/Pythoncode')
 import numpy as np
 import matplotlib.pyplot as plt
+from file_io.utility import construct_output_path
 
 def plot_brightness_array(brightness_array, x_limit=None, y_limit=None, save_path=None):
     """
@@ -76,40 +79,52 @@ def create_contour_plot(data, save_path=None):
 
 
 
-def create_image_plot(data, peaks=None, mean=None, save_path=None, colormap='viridis'):
+def create_image_plot(data, peaks=None, mean=None, input_path=None, peaks_name="peaks"):
     """
     Creates an image plot from a 2D array representing pixel brightness and overlays points.
 
     Parameters:
         - data (np.ndarray): 2D array with pixel brightness values.
         - peaks (np.ndarray): (n, 2) array with the estimated laser point centers.
-        - mean_values (np.ndarray): (n, 2) array with calculated laser point centers (optional).
-        - filename (str): The file name where the plot is saved (default: 'image_plot.png').
+        - mean (np.ndarray): (n, 2) array with calculated laser point centers (optional).
+        - input_path (str): Path to the input directory (for constructing the output path).
+        - peaks_name (str): Name of the peaks variable for the file name (default: "peaks").
         - colormap (str): The colormap used for the image plot.
-        - x_limits (tuple): (min_x, max_x) to set limits on the x-axis (optional).
-        - y_limits (tuple): (min_y, max_y) to set limits on the y-axis (optional).
+        - buffer (int): Value to extend the axis limits beyond the peaks (default: 100).
     """
+    import matplotlib.pyplot as plt
 
     plt.figure(figsize=(10, 6))
+    colormap = 'viridis'
     plt.imshow(data, cmap=colormap, interpolation='nearest')
     plt.colorbar(label='Brightness')
 
     if peaks is not None:
         plt.plot(peaks[:, 0], peaks[:, 1], 'ro', markersize=1, label='Peaks')
+
     if mean is not None:
         plt.plot(mean[:, 0], mean[:, 1], 'bo', markersize=1, label='Mean Points')
+
+    if peaks is not None:
+        buffer = 100
+        x_min, x_max = peaks[:, 0].min() - buffer, peaks[:, 0].max() + buffer
+        y_min, y_max = peaks[:, 1].min() - buffer, peaks[:, 1].max() + buffer
+        plt.xlim(x_min, x_max)
+        plt.ylim(y_min, y_max)
 
     plt.legend()
     plt.gca().invert_yaxis()
     plt.xlabel('X-Axis')
     plt.ylabel('Y-Axis')
-    #plt.xlim(1600,3100)
-    plt.xlim(1000,2500)
-    plt.ylim(750,2250)
-    
-    if save_path:
+
+    if input_path:
+        filename = f"plot_{peaks_name}.png"
+        save_path = construct_output_path(input_path, filename=filename)
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"Image plot saved at: {save_path}")
+    else:
+        print("Input path not provided. Plot not saved.")
+
     plt.close()
 
 
@@ -175,18 +190,16 @@ def plot_2d_points_pair(points_2d_1, points_2d_2, title='2D Scatter Plot of Two 
 
 
 
-def plot_3d_points(points_3d, title='3D Scatter Plot', save_path=None):
+def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
     """
-    Plots 3D points using matplotlib and saves the plot to a file if specified.
-
+    Plots 3D points using matplotlib and saves the plot to a specified path.
+    
     Parameters:
-        - points_3d (np.ndarray): A (n, 3) array containing the 3D coordinates of
-        the points (X, Y, Z).
-        - title (str): The title of the plot.
-        - save_as_file (bool): If True, the plot is saved as a file.
-        - filename (str): The filename for the plot image (if save_as_file is True).
+        - points_3d (np.ndarray): A (n, 3) array containing the 3D coordinates of the points (X, Y, Z).
+        - pfad (str): The directory path where the plot will be saved.
+        - dateiname (str): The name of the file to save the plot (default: "3d_plot.png").
     """
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(12, 8))
     axis = fig.add_subplot(111, projection='3d')
 
     x_coords, y_coords, z_coords = points_3d[:, 0], points_3d[:, 1], points_3d[:, 2]
@@ -196,13 +209,18 @@ def plot_3d_points(points_3d, title='3D Scatter Plot', save_path=None):
     axis.set_xlabel('X')
     axis.set_ylabel('Y')
     axis.set_zlabel('Z')
-    axis.set_title(title)
-    
-    plt.show()
+    axis.set_title("3D Scatter Plot")  # Der Titel bleibt fest.
 
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+
+    if path:
+        # Vollständigen Pfad erstellen
+        save_path = os.path.join(path, dateiname)
+        # Sicherstellen, dass der Ordner existiert
+        os.makedirs(path, exist_ok=True)
+        # Plot speichern
+        plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"3D plot saved at: {save_path}")
+
     plt.close()
 
 
@@ -215,7 +233,8 @@ def plot_differences_as_bar_chart(differences, abs_values=False, save_path=None)
     Parameters:
     - differences (np.ndarray): Array of shape (n, 2) containing the (x, y) differences.
     - abs_values (bool): Whether to plot the absolute values of the differences (default: False).
-    - save_path (str or None): Path to save the PNG file. If None, the plot is not saved (default: None).
+    - save_path (str or None): Path to save the PNG file. If None, the plot
+    is not saved (default: None).
     """
     if abs_values:
         differences = np.abs(differences)

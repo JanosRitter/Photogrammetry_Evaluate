@@ -69,27 +69,37 @@ def block_average(brightness_array, factor=15):
 
 
 
-def find_peaks(brightness_array, factor=15, threshold=40, filename='estimated_peak_array.dat'):
+def find_peaks(brightness_array, factor=15, threshold=None, filename='estimated_peak_array.dat'):
     """
     Finds the maximum points in a 7x7 Subarray and applies a threshold to filter noise.
 
     Parameters:
         - brightness_array (np.ndarray): A 2D array with the intensity data.
         - factor (int): The block averaging factor.
-        - threshold (int): Minimum intensity value for a point to be considered a peak.
+        - threshold (int or None): Minimum intensity value for a point to be considered a peak.
+                                    If None, the threshold is set to the average of brightness_array.
+        - filename (str): Name of the file to save the peak array.
 
     Returns:
         - np.ndarray: An (n, 2) array with the x-y coordinates of the peaks.
     """
 
+    # Calculate threshold if not provided
+    if threshold is None:
+        threshold = np.mean(brightness_array)
+        print(f"Threshold automatically calculated as: {threshold}")
+
+    # Perform block averaging
     data, factor = block_average(brightness_array, factor)
 
+    # Initialize peak storage
     max_peaks = (data.shape[0] // 7) * (data.shape[1] // 7)
     peaks = np.zeros((max_peaks, 2), dtype=int)
     peak_count = 0
 
     rows, cols = data.shape
 
+    # Identify peaks
     for j in range(3, cols - 3):
         for i in range(3, rows - 3):
             subarray = data[i-3:i+4, j-3:j+4]
@@ -99,10 +109,6 @@ def find_peaks(brightness_array, factor=15, threshold=40, filename='estimated_pe
                     peaks[peak_count] = [j * factor, i * factor]
                     peak_count += 1
 
-    file_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner"
-    file_name = filename
-
-    save_array_as_npy(peaks, file_path, file_name)
 
     return peaks[:peak_count]
 

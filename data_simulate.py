@@ -89,7 +89,7 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0,
 d = 10.0
 n = 8
 alpha = 1/3
-angle= (0,0)
+angle= (15,0)
 points = generate_laser_projection_on_rotated_plane(d, n, alpha, angle=angle)
 print(points.shape)
 
