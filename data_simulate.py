@@ -89,7 +89,7 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0,
 d = 10.0
 n = 8
 alpha = 1/3
-angle= (15,0)
+angle= (0,0)
 points = generate_laser_projection_on_rotated_plane(d, n, alpha, angle=angle)
 print(points.shape)
 
@@ -113,7 +113,7 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
     Returns:
     - np.ndarray: Two arrays of shape (n, 2), representing the pixel (x, y) coordinates for each laser point on each camera.
     """
-    save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\simulated_data"
+    save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\simulated_data_different_scales"
     
     rho, phi = angle
     n_points = laser_points.shape[0]
@@ -137,11 +137,13 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
         cam1_coords[i, 1] = intersect_cam1[1] / pixel_size + resolution[1] / 2
         cam2_coords[i, 0] = (intersect_cam2[0] + a) / pixel_size + resolution[0] / 2
         cam2_coords[i, 1] = intersect_cam2[1] / pixel_size + resolution[1] / 2
-
     
+    factor = 10
+    cam1_coords = factor * cam1_coords
+    cam2_coords = factor * cam2_coords
 
-    cam1_filename = f"projection_rho_{rho}_phi_{phi}_cam1.npy"
-    cam2_filename = f"projection_rho_{rho}_phi_{phi}_cam2.npy"
+    cam1_filename = f"projection_cam1_scale_10.npy"
+    cam2_filename = f"projection_cam2_scale_10.npy"
 
     np.save(os.path.join(save_path, cam1_filename), cam1_coords)
     np.save(os.path.join(save_path, cam2_filename), cam2_coords)

@@ -79,20 +79,17 @@ def create_contour_plot(data, save_path=None):
 
 
 
-def create_image_plot(data, peaks=None, mean=None, input_path=None, peaks_name="peaks"):
+def create_image_plot(data, peaks=None, mean=None, output_path=None, output_filename="plot.png"):
     """
     Creates an image plot from a 2D array representing pixel brightness and overlays points.
 
     Parameters:
         - data (np.ndarray): 2D array with pixel brightness values.
-        - peaks (np.ndarray): (n, 2) array with the estimated laser point centers.
+        - peaks (np.ndarray): (n, 2) array with the estimated laser point centers (optional).
         - mean (np.ndarray): (n, 2) array with calculated laser point centers (optional).
-        - input_path (str): Path to the input directory (for constructing the output path).
-        - peaks_name (str): Name of the peaks variable for the file name (default: "peaks").
-        - colormap (str): The colormap used for the image plot.
-        - buffer (int): Value to extend the axis limits beyond the peaks (default: 100).
+        - output_path (str): Path to the output directory (for saving the plot).
+        - output_filename (str): Name of the output file (default: "plot.png").
     """
-    import matplotlib.pyplot as plt
 
     plt.figure(figsize=(10, 6))
     colormap = 'viridis'
@@ -117,13 +114,14 @@ def create_image_plot(data, peaks=None, mean=None, input_path=None, peaks_name="
     plt.xlabel('X-Axis')
     plt.ylabel('Y-Axis')
 
-    if input_path:
-        filename = f"plot_{peaks_name}.png"
-        save_path = construct_output_path(input_path, filename=filename)
+    if output_path:
+        if not os.path.exists(output_path):
+            os.makedirs(output_path)
+        save_path = os.path.join(output_path, output_filename)
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"Image plot saved at: {save_path}")
     else:
-        print("Input path not provided. Plot not saved.")
+        print("Output path not provided. Plot not saved.")
 
     plt.close()
 
@@ -226,41 +224,82 @@ def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
 
 
 
-def plot_differences_as_bar_chart(differences, abs_values=False, save_path=None):
+def plot_differences_as_bar_chart(differences, output_path, plot_type="all", abs_values=False, output_filename="differences_plot.png"):
     """
-    Plots the differences (x and y separately) as bar charts and optionally saves the figure.
+    Plots the differences (x, y, and optionally z) as bar charts and/or the Euclidean norm.
 
     Parameters:
-    - differences (np.ndarray): Array of shape (n, 2) containing the (x, y) differences.
+    - differences (np.ndarray): Array of shape (n, 2) or (n, 3) containing the (x, y, z) differences.
+    - output_path (str): Path to the output directory for saving the plots.
+    - plot_type (str): Type of differences to plot. Options: "x", "y", "z", "norm", "all" (default: "all").
     - abs_values (bool): Whether to plot the absolute values of the differences (default: False).
-    - save_path (str or None): Path to save the PNG file. If None, the plot
-    is not saved (default: None).
+    - output_filename (str): Name of the output file (default: "differences_plot.png").
     """
+    if differences.shape[1] not in {2, 3}:
+        raise ValueError("Input array must have shape (n, 2) or (n, 3).")
+
     if abs_values:
         differences = np.abs(differences)
-    
+
     x_diff = differences[:, 0]
     y_diff = differences[:, 1]
-    n = len(x_diff)
+    z_diff = differences[:, 2] if differences.shape[1] == 3 else None
 
-    fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+    # Calculate Euclidean norm
+    norm = np.linalg.norm(differences, axis=1)
 
-    axes[0].bar(range(n), x_diff, color='blue', alpha=0.7)
-    axes[0].set_ylabel("X Differences")
-    axes[0].set_title("X-Differences (absolute)" if abs_values else "X-Differences")
-    axes[0].grid(True, linestyle='--', alpha=0.6)
+    # Define plots based on plot_type
+    available_plots = {
+        "x": x_diff,
+        "y": y_diff,
+        "z": z_diff,
+        "norm": norm
+    }
+    if plot_type == "all":
+        plot_keys = ["x", "y", "z", "norm"] if z_diff is not None else ["x", "y", "norm"]
+    elif plot_type in available_plots:
+        plot_keys = [plot_type]
+    else:
+        raise ValueError(f"Invalid plot_type: {plot_type}. Choose from 'x', 'y', 'z', 'norm', 'all'.")
 
-    axes[1].bar(range(n), y_diff, color='orange', alpha=0.7)
-    axes[1].set_ylabel("Y Differences")
-    axes[1].set_title("Y-Differences (absolute)" if abs_values else "Y-Differences")
-    axes[1].set_xlabel("Index")
-    axes[1].grid(True, linestyle='--', alpha=0.6)
+    # Ensure output folder exists
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
 
-    plt.tight_layout()
-    
-    if save_path is not None:
+    # Create a plot for each selected type
+    for key in plot_keys:
+        if available_plots[key] is None:  # Skip if "z" is requested but not available
+            continue
+
+        plt.figure(figsize=(10, 6))
+        plt.bar(range(len(available_plots[key])), available_plots[key], color='blue', alpha=0.7)
+        plt.xlabel("Index")
+        plt.ylabel(f"{key.capitalize()} Differences")
+        plt.title(f"{key.capitalize()} Differences (absolute)" if abs_values else f"{key.capitalize()} Differences")
+        plt.grid(True, linestyle='--', alpha=0.6)
+
+        # Save plot
+        save_filename = f"{key}_{output_filename}"
+        save_path = os.path.join(output_path, save_filename)
         plt.savefig(save_path, dpi=300)
         print(f"Plot saved as {save_path}")
-    
-    plt.show()
-    plt.close()
+        plt.close()
+
+    # Save combined plot if "all" is selected
+    if plot_type == "all":
+        num_plots = len(plot_keys)
+        fig, axes = plt.subplots(num_plots, 1, figsize=(10, 4 * num_plots), sharex=True)
+
+        for idx, key in enumerate(plot_keys):
+            axes[idx].bar(range(len(available_plots[key])), available_plots[key], color='blue', alpha=0.7)
+            axes[idx].set_ylabel(f"{key.capitalize()} Differences")
+            axes[idx].set_title(f"{key.capitalize()} Differences (absolute)" if abs_values else f"{key.capitalize()} Differences")
+            axes[idx].grid(True, linestyle='--', alpha=0.6)
+
+        axes[-1].set_xlabel("Index")
+        plt.tight_layout()
+
+        save_path = os.path.join(output_path, f"all_{output_filename}")
+        plt.savefig(save_path, dpi=300)
+        print(f"Combined plot saved as {save_path}")
+        plt.close()

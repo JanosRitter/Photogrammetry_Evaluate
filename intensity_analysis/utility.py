@@ -28,7 +28,7 @@ def subtract_mean_background(array):
 
 
 
-def find_average_distance(peaks, factor=0.5):
+def find_average_distance(peaks, factor=0.4):
     """
     Berechnet den durchschnittlichen Abstand zwischen den Peaks und multipliziert
     diesen mit einem Faktor.

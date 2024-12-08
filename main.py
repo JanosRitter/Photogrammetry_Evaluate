@@ -1,14 +1,14 @@
 import file_io
 import intensity_analysis
-from peak_find import find_peaks, peak_filter
+from peak_find import find_peaks_7, peak_filter
 
 
-inputpath = r"example_set_1\example_3"
+inputpath = r"example_set_1\example_5"
 
 def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     """
     Detects peaks in two brightness arrays, compares their shapes, and applies filtering if needed.
-    Allows the user to force filtering even if the shapes match.
+    Allows the user to force filtering even if the shapes match or mismatch.
 
     Parameters:
         - inputpath (str): Path to the input data containing the brightness arrays.
@@ -20,27 +20,27 @@ def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     """
     brightness_array_1, brightness_array_2 = load_brightness_arrays(inputpath)
 
-    peaks_1 = find_peaks(brightness_array_1, factor=factor, threshold=threshold)
+    peaks_1 = find_peaks_7(brightness_array_1, factor=factor, threshold=threshold)
     print("Number of peaks found in Array 1:", peaks_1.shape[0])
     
-    peaks_2 = find_peaks(brightness_array_2, factor=factor, threshold=threshold)
+    peaks_2 = find_peaks_7(brightness_array_2, factor=factor, threshold=threshold)
     print("Number of peaks found in Array 2:", peaks_2.shape[0])
 
     if peaks_1.shape[0] == peaks_2.shape[0]:
         print("Number of peaks in both arrays match.")
-        filter_prompt = input("Do you want to apply filtering anyway? (yes/no): ").strip().lower()
-        if filter_prompt == "yes":
-            print("Applying filtering despite matching number of peaks...")
-            peaks_1 = peak_filter(peaks_1)
-            peaks_2 = peak_filter(peaks_2)
-            print("Filtering complete.")
-        else:
-            print("Skipping filtering as numbers match and user opted out.")
     else:
-        print("Mismatch in the number of peaks. Applying filtering...")
+        print("Mismatch in the number of peaks.")
+
+    filter_prompt = input("Do you want to apply filtering? (yes/no): ").strip().lower()
+    if filter_prompt == "yes":
+        print("Applying filtering...")
         peaks_1 = peak_filter(peaks_1)
         peaks_2 = peak_filter(peaks_2)
         print("Filtering complete.")
+        print("Number of peaks found in Array 1:", peaks_1.shape[0])
+        print("Number of peaks found in Array 2:", peaks_2.shape[0])
+    else:
+        print("Skipping filtering as per user request.")
 
     if peaks_1.shape[0] == peaks_2.shape[0]:
         print("Final check: Number of peaks in both arrays match.")
@@ -52,7 +52,7 @@ def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     save_array_as_npy(peaks_1, output_path, "peaks_1.npy")
     save_array_as_npy(peaks_2, output_path, "peaks_2.npy")
     
-    print("peaks were saved")
+    print("Peaks were saved.")
         
     create_image_plot(brightness_array_1, peaks_1, input_path=inputpath, peaks_name="peaks_1")
     create_image_plot(brightness_array_2, peaks_2, input_path=inputpath, peaks_name="peaks_2")
@@ -101,6 +101,9 @@ def calc_lpc_and_3d(inputpath, methode="center_of_mass", camera_stats=None):
     lpc_sortet_1 = analyze_coordinates(lpc_1)
     lpc_sortet_2 = analyze_coordinates(lpc_2)
     
+    save_array_as_npy(lpc_sortet_1, peak_path, "lpc_1.npy")
+    save_array_as_npy(lpc_sortet_2, peak_path, "lpc_2.npy")
+    
     points_3d = triangulate_3d(lpc_sortet_1, lpc_sortet_2, camera_stats)
     save_array_as_npy(points_3d, peak_path, "points_3d.npy")
     plot_3d_points(points_3d, path=peak_path)
@@ -109,5 +112,5 @@ def calc_lpc_and_3d(inputpath, methode="center_of_mass", camera_stats=None):
 
     
     
-calc_lpc_and_3d(inputpath, camera_stats=camera_stats)
+#calc_lpc_and_3d(inputpath, camera_stats=camera_stats)
 

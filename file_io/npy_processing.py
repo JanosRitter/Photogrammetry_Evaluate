@@ -60,6 +60,33 @@ def load_brightness_arrays(folder_name):
 
 
 
+def load_all_npy_files(folder_path, filenames=None):
+    """
+    Loads all `.npy` files from a folder or a specified subset of files.
+
+    Parameters:
+    - folder_path (str): Path to the folder containing `.npy` files.
+    - filenames (list or None): A list of specific `.npy` filenames to load. If None, all `.npy` files are loaded.
+
+    Returns:
+    - tuple: (npy_files, arrays)
+        - npy_files: List of loaded `.npy` filenames.
+        - arrays: List of corresponding arrays loaded from the `.npy` files.
+    """
+    all_npy_files = sorted([file for file in os.listdir(folder_path) if file.lower().endswith('.npy')])
+
+    if filenames is not None:
+        npy_files = [file for file in all_npy_files if file in filenames]
+    else:
+        npy_files = all_npy_files
+
+    arrays = [np.load(os.path.join(folder_path, file)) for file in npy_files]
+
+    return npy_files, arrays
+
+
+
+
 
 def save_array_as_npy(array, file_path, file_name):
     """

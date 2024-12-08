@@ -69,9 +69,60 @@ def block_average(brightness_array, factor=15):
 
 
 
-def find_peaks(brightness_array, factor=15, threshold=None, filename='estimated_peak_array.dat'):
+def find_peaks(brightness_array, factor=15, threshold=None, window_size=7):
     """
-    Finds the maximum points in a 7x7 Subarray and applies a threshold to filter noise.
+    Finds the maximum points in a specified subarray and applies a threshold to filter noise.
+
+    Parameters:
+        - brightness_array (np.ndarray): A 2D array with the intensity data.
+        - factor (int): The block averaging factor.
+        - threshold (int or None): Minimum intensity value for a point to be considered a peak.
+                                    If None, the threshold is set to the average of brightness_array.
+        - window_size (int): The size of the square subarray to consider for peak detection.
+                             Must be an odd number. Default is 7.
+
+    Returns:
+        - np.ndarray: An (n, 2) array with the x-y coordinates of the peaks.
+    """
+    # Ensure the window size is an odd number
+    if window_size % 2 == 0:
+        raise ValueError("window_size must be an odd number.")
+    
+    # Calculate threshold if not provided
+    if threshold is None:
+        threshold = np.mean(brightness_array)
+        print(f"Threshold automatically calculated as: {threshold}")
+
+    # Perform block averaging
+    data, factor = block_average(brightness_array, factor)
+
+    # Calculate padding based on window size
+    half_window = window_size // 2
+
+    # Initialize peak storage
+    max_peaks = (data.shape[0] // window_size) * (data.shape[1] // window_size)
+    peaks = np.zeros((max_peaks, 2), dtype=int)
+    peak_count = 0
+
+    rows, cols = data.shape
+
+    # Identify peaks
+    for j in range(half_window, cols - half_window):
+        for i in range(half_window, rows - half_window):
+            subarray = data[i - half_window:i + half_window + 1, j - half_window:j + half_window + 1]
+
+            if data[i, j] == np.max(subarray) and data[i, j] > threshold:
+                if peak_count < max_peaks:
+                    peaks[peak_count] = [j * factor, i * factor]
+                    peak_count += 1
+
+    return peaks[:peak_count]
+
+
+
+def find_peaks_5(brightness_array, factor=15, threshold=None, filename='estimated_peak_array.dat'):
+    """
+    Finds the maximum points in a 5x5 Subarray and applies a threshold to filter noise.
 
     Parameters:
         - brightness_array (np.ndarray): A 2D array with the intensity data.
@@ -93,22 +144,21 @@ def find_peaks(brightness_array, factor=15, threshold=None, filename='estimated_
     data, factor = block_average(brightness_array, factor)
 
     # Initialize peak storage
-    max_peaks = (data.shape[0] // 7) * (data.shape[1] // 7)
+    max_peaks = (data.shape[0] // 5) * (data.shape[1] // 5)
     peaks = np.zeros((max_peaks, 2), dtype=int)
     peak_count = 0
 
     rows, cols = data.shape
 
     # Identify peaks
-    for j in range(3, cols - 3):
-        for i in range(3, rows - 3):
-            subarray = data[i-3:i+4, j-3:j+4]
+    for j in range(2, cols - 2):  # Adjust for 5x5 neighborhood
+        for i in range(2, rows - 2):
+            subarray = data[i-2:i+3, j-2:j+3]  # 5x5 subarray
 
             if data[i, j] == np.max(subarray) and data[i, j] > threshold:
                 if peak_count < max_peaks:
                     peaks[peak_count] = [j * factor, i * factor]
                     peak_count += 1
-
 
     return peaks[:peak_count]
 
