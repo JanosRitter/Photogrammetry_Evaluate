@@ -1,21 +1,22 @@
 """
-Module: center_of_mass
+Module: non_linear_center_of_mass
 
 This module provides functionality to compute the center of mass and its associated uncertainties
 for intensity distributions represented in 3D numpy arrays. Each slice of the input 3D array
 is treated as a 2D intensity distribution, allowing for per-slice analysis of center-of-mass
-properties.
+properties. To increase the contribution of high values an exponent > 1 is applied.
 
 Key Functionality:
-- `compute_center_of_mass_with_uncertainty`: Calculates the center of mass and uncertainties
+- `non_linear_center_of_mass`: Calculates the center of mass and uncertainties
   for each 2D slice of a 3D array. This is particularly useful for analyzing intensity
   distributions in applications such as imaging, material analysis, or scientific experiments.
 """
 import numpy as np
 
-def compute_center_of_mass_with_uncertainty(data_3d):
+def non_linear_center_of_mass(data_3d):
     """
-    Computes the center of mass and its uncertainty for each 2D slice of a 3D array.
+    Computes the center of mass and its uncertainty for each 2D slice of a 3D array,
+    with non-linear weighting (square of values).
 
     Parameters:
     - data_3d (np.ndarray): Input 3D array of shape (num, height, width),
@@ -38,19 +39,22 @@ def compute_center_of_mass_with_uncertainty(data_3d):
 
     for i in range(num_slices):
         slice_2d = data_3d[i]
-        total_mass = np.sum(slice_2d)
+
+        weighted_slice = slice_2d ** 3
+
+        total_mass = np.sum(weighted_slice)
         if total_mass == 0:
             centers_of_mass[i] = [np.nan, np.nan]
             uncertainties[i] = [np.nan, np.nan]
             continue
 
         x_indices, y_indices = np.meshgrid(np.arange(width), np.arange(height))
-        x_center = np.sum(x_indices * slice_2d) / total_mass
-        y_center = np.sum(y_indices * slice_2d) / total_mass
+        x_center = np.sum(x_indices * weighted_slice) / total_mass
+        y_center = np.sum(y_indices * weighted_slice) / total_mass
         centers_of_mass[i] = [x_center, y_center]
 
-        x_uncertainty = np.sqrt(np.sum((x_indices - x_center) ** 2 * slice_2d) / total_mass)
-        y_uncertainty = np.sqrt(np.sum((y_indices - y_center) ** 2 * slice_2d) / total_mass)
+        x_uncertainty = np.sqrt(np.sum((x_indices - x_center) ** 2 * weighted_slice) / total_mass)
+        y_uncertainty = np.sqrt(np.sum((y_indices - y_center) ** 2 * weighted_slice) / total_mass)
         uncertainties[i] = [x_uncertainty, y_uncertainty]
 
     return centers_of_mass, uncertainties

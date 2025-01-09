@@ -1,11 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-
-from file_io import plot_3d_points
-from lpc_indexing import find_outlier_point, analyze_coordinates
+from file_io.plotting import plot_3d_points
 from calc_3d import triangulate_3d
-from mpl_toolkits.mplot3d import Axes3D
+
+
 
 def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0, 0)):
     """
@@ -86,18 +85,18 @@ def generate_laser_projection_on_rotated_plane(d, n, alpha, beta=None, angle=(0,
     return np.array(points)
 
 # Example usage
-d = 10.0
+d = 50.0
 n = 8
 alpha = 1/3
 angle= (0,0)
 points = generate_laser_projection_on_rotated_plane(d, n, alpha, angle=angle)
-print(points.shape)
+#print(points.shape)
 
 
-plot_3d_points(points)
+#plot_3d_points(points)
 
 
-def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, resolution=(4096, 3000), angle=angle):
+def project_points_to_cameras(laser_points, a=0.2, f=0.05, pixel_size=2.74e-6, resolution=(4096, 3000), angle=angle):
     """
     Projects laser points onto two camera screens, providing pixel coordinates, and saves the results with a filename including angles.
 
@@ -113,7 +112,7 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
     Returns:
     - np.ndarray: Two arrays of shape (n, 2), representing the pixel (x, y) coordinates for each laser point on each camera.
     """
-    save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\simulated_data_different_scales"
+    save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\sim_dat_diff_distance\spotsize_10"
     
     rho, phi = angle
     n_points = laser_points.shape[0]
@@ -138,12 +137,11 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
         cam2_coords[i, 0] = (intersect_cam2[0] + a) / pixel_size + resolution[0] / 2
         cam2_coords[i, 1] = intersect_cam2[1] / pixel_size + resolution[1] / 2
     
-    factor = 10
+    factor = 5
     cam1_coords = factor * cam1_coords
     cam2_coords = factor * cam2_coords
-
-    cam1_filename = f"projection_cam1_scale_10.npy"
-    cam2_filename = f"projection_cam2_scale_10.npy"
+    cam1_filename = f"projection_cam1_dis_10.npy"
+    cam2_filename = f"projection_cam2_dis_10.npy"
 
     np.save(os.path.join(save_path, cam1_filename), cam1_coords)
     np.save(os.path.join(save_path, cam2_filename), cam2_coords)
@@ -153,7 +151,7 @@ def project_points_to_cameras(laser_points, a=0.2, f=0.04, pixel_size=2.74e-6, r
     return cam1_coords, cam2_coords
 
 
-cam1_coords, cam2_coords = project_points_to_cameras(points)
+#cam1_coords, cam2_coords = project_points_to_cameras(points)
 
 
 
@@ -189,18 +187,18 @@ def plot_2d_points_pair(points_2d_1, points_2d_2, labels=('Dataset 1', 'Dataset 
     
     
 
-plot_2d_points_pair(cam1_coords, cam2_coords)
+#plot_2d_points_pair(cam1_coords, cam2_coords)
 
 camera_stats = {
     'a': 0.2,                  # Distance from the cameras to the origin plane along the x-axis
-    'f': 0.04,                 # Focal length of the cameras in meters
+    'f': 0.05,                 # Focal length of the cameras in meters
     'pixel_size': 2.74e-6,     # Pixel size in meters
     'resolution': (4096, 3000) # Resolution of the cameras in pixels (width, height)
 }
 
-three_d_points = triangulate_3d(cam1_coords, cam2_coords, camera_stats)
+#three_d_points = triangulate_3d(cam1_coords/5, cam2_coords/5, camera_stats)
 
-plot_3d_points(three_d_points)
+#plot_3d_points(three_d_points)
 
 #print(three_d_points)
 
@@ -241,11 +239,122 @@ def plot_coordinates(coordinates, save_path):
 
 
 
-save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\cam2.png"
+#save_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\cam2.png"
 
-plot_coordinates(cam2_coords, save_path)
+#plot_coordinates(cam2_coords, save_path)
+
+def simulate_background_noise(array_shape=(3000, 4096), mean=0, std=1):
+    """
+    Simuliert Hintergrundrauschen als normalverteiltes Zufalls-Array,
+    wobei die Werte ganzzahlig und positiv sind.
+
+    Parameter:
+    - array_shape (tuple): Die Form des Ausgangsarrays, z. B. (3000, 4096).
+    - mean (float): Der Mittelwert der Normalverteilung.
+    - std (float): Die Standardabweichung der Normalverteilung.
+
+    Rückgabewert:
+    - np.ndarray: Array mit der Form `array_shape`, das simuliertes, ganzzahliges, positives Rauschen enthält.
+    """
+    # Erzeugung des Rauschens mit normalverteilten Zufallswerten
+    noise_array = np.random.normal(loc=mean, scale=std, size=array_shape)
+
+    # Setze alle negativen Werte auf 0
+    noise_array = np.maximum(noise_array, 0)
+
+    # Runden der Werte auf die nächste ganze Zahl
+    noise_array = np.round(noise_array).astype(int)
+
+    return noise_array
 
 
+
+def add_noise_to_data(data, noise, offset=0, value_range=(0, 255)):
+    """
+    Combines measurement data with noise while handling saturation for 8-bit data.
+    
+    Parameters:
+    - data (np.ndarray): Original measurement data (e.g., shape (3000, 4096)).
+    - noise (np.ndarray): Simulated noise to be added (same shape as `data`).
+    - offset (int): Value to subtract from the original data before adding noise. Minimum value after subtraction is 0.
+    - value_range (tuple): Tuple specifying the valid range of values (default: (0, 255)).
+    
+    Returns:
+    - np.ndarray: Combined data with noise, clipped to `value_range`.
+    """
+    min_val, max_val = value_range
+
+    # Umwandeln in float32, um negative Werte zu erlauben
+    data_float = data.astype(np.float32)
+
+    # Debugging: Werte vor dem Subtrahieren des Offsets
+    print(f"Original Data Statistics (before offset):\nMin: {data_float.min()}\nMax: {data_float.max()}\nMean: {data_float.mean()}")
+
+    # Subtrahiere den Offset, ohne Werte unter 0 zu lassen
+    adjusted_data = np.clip(data_float - offset, min_val, None)
+
+    # Debugging: Werte nach dem Abziehen des Offsets
+    print(f"Adjusted Data Statistics (after offset):\nMin: {adjusted_data.min()}\nMax: {adjusted_data.max()}\nMean: {adjusted_data.mean()}")
+
+    # Addiere das Rauschen
+    noisy_data = adjusted_data + noise
+
+    # Debugging: Werte nach Hinzufügen des Rauschens
+    print(f"Noisy Data Statistics (before clipping):\nMin: {noisy_data.min()}\nMax: {noisy_data.max()}\nMean: {noisy_data.mean()}")
+
+    # Clip die Werte auf den gültigen Bereich
+    noisy_data_clipped = np.clip(noisy_data, min_val, max_val)
+
+    # Debugging: Werte nach dem Clipping
+    print(f"Noisy Data Statistics (after clipping):\nMin: {noisy_data_clipped.min()}\nMax: {noisy_data_clipped.max()}\nMean: {noisy_data_clipped.mean()}")
+
+    # Rückumwandeln in uint8 (falls nötig)
+    noisy_data_uint8 = noisy_data_clipped.astype(np.uint8)
+
+    return noisy_data_uint8
+
+
+def add_noise_to_folder(input_folder, output_folder_name, mean, std, offset):
+    """
+    Adds background noise to all `.npy` files in a folder and saves the noisy arrays
+    in a new folder.
+
+    Parameters:
+    - input_folder (str): Path to the folder containing `.npy` files.
+    - output_folder_name (str): Name of the new folder to save noisy data.
+    - mean (float): Mean of the noise distribution.
+    - std (float): Standard deviation of the noise distribution.
+    - offset (float): Value to subtract from data before adding noise.
+    
+    Returns:
+    - None
+    """
+    npy_files, arrays = load_all_npy_files(input_folder)
+
+    base_folder = os.path.dirname(input_folder)
+    output_folder = os.path.join(base_folder, output_folder_name)
+
+    os.makedirs(output_folder, exist_ok=True)
+
+    for filename, array in zip(npy_files, arrays):
+        array_shape = array.shape
+        print("Original Data Statistics:")
+        print("Min:", np.min(array))
+        print("Max:", np.max(array))
+        print("Mean:", np.mean(array))
+
+        noise = simulate_background_noise(array_shape=array_shape, mean=mean, std=std)
+        print("Simulated Noise Statistics:")
+        print("Min:", np.min(noise))
+        print("Max:", np.max(noise))
+        print("Mean:", np.mean(noise))
+
+        noisy_array = add_noise_to_data(data=array, noise=noise, offset=offset)
+
+        output_path = os.path.join(output_folder, filename)
+        np.save(output_path, noisy_array)
+
+        print(f"Processed and saved: {filename} -> {output_path}")
 
 
 

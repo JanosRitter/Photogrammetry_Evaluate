@@ -24,37 +24,24 @@ def load_brightness_arrays(folder_name):
 
     base_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input"
     folder_path = os.path.join(base_path, folder_name)
-    bmp_files = sorted([file for file in os.listdir(folder_path) if file.lower().endswith('.bmp')])
 
+    bmp_files = sorted([f for f in os.listdir(folder_path) if f.lower().endswith('.bmp')])
     if len(bmp_files) != 2:
         raise ValueError(f"Expected exactly 2 BMP files, but found {len(bmp_files)}.")
 
-    brightness_arrays = []
+    def load_or_process_brightness(file_name):
+        npy_path = os.path.join(folder_path, file_name.replace('.bmp', '.npy'))
+        if os.path.exists(npy_path):
+            print(f".npy file found: Loading {npy_path}")
+            return np.load(npy_path)
+        print(f".npy file not found: Processing {file_name} and saving as {npy_path}")
+        img = Image.open(os.path.join(folder_path, file_name)).convert('RGB')
+        brightness_array = np.mean(np.array(img), axis=2).astype(np.uint8)  # Mittelwert der Kanäle
+        np.save(npy_path, brightness_array)
+        print(f"Brightness array saved as {npy_path}")
+        return brightness_array
 
-    for bmp_file in bmp_files:
-        bmp_path = os.path.join(folder_path, bmp_file)
-        npy_file_path = os.path.join(folder_path, bmp_file.replace('.bmp', '.npy'))
-
-        if os.path.exists(npy_file_path):
-            print(f".npy file found: Loading {npy_file_path}")
-            brightness_array = np.load(npy_file_path)
-        else:
-            print(f".npy file not found: Processing {bmp_file} and saving as {npy_file_path}")
-            img = Image.open(bmp_path).convert('RGB')
-            width, height = img.size
-            brightness_array = np.zeros((height, width), dtype=np.uint8)
-
-            for y_value in range(height):
-                for x_value in range(width):
-                    red, green, blue = img.getpixel((x_value, y_value))
-                    brightness = (red + green + blue) / 3
-                    brightness_array[y_value, x_value] = brightness
-
-            np.save(npy_file_path, brightness_array)
-            print(f"Brightness array saved as {npy_file_path}")
-
-        brightness_arrays.append(brightness_array)
-
+    brightness_arrays = [load_or_process_brightness(f) for f in bmp_files]
     return brightness_arrays[0], brightness_arrays[1]
 
 
@@ -66,19 +53,20 @@ def load_all_npy_files(folder_path, filenames=None):
 
     Parameters:
     - folder_path (str): Path to the folder containing `.npy` files.
-    - filenames (list or None): A list of specific `.npy` filenames to load. If None, all `.npy` files are loaded.
+    - filenames (list or None): A list of specific `.npy` filenames to load. If None, all
+    `.npy` files are loaded.
 
     Returns:
     - tuple: (npy_files, arrays)
         - npy_files: List of loaded `.npy` filenames.
         - arrays: List of corresponding arrays loaded from the `.npy` files.
     """
-    all_npy_files = sorted([file for file in os.listdir(folder_path) if file.lower().endswith('.npy')])
+    all_npys = sorted([file for file in os.listdir(folder_path) if file.lower().endswith('.npy')])
 
     if filenames is not None:
-        npy_files = [file for file in all_npy_files if file in filenames]
+        npy_files = [file for file in all_npys if file in filenames]
     else:
-        npy_files = all_npy_files
+        npy_files = all_npys
 
     arrays = [np.load(os.path.join(folder_path, file)) for file in npy_files]
 

@@ -90,7 +90,9 @@ def find_peaks(brightness_array, factor=15, threshold=None, window_size=7):
     
     # Calculate threshold if not provided
     if threshold is None:
-        threshold = np.mean(brightness_array)
+        mean_value = np.mean(brightness_array)
+        std_dev = np.std(brightness_array)
+        threshold = mean_value + (std_dev / 2)
         print(f"Threshold automatically calculated as: {threshold}")
 
     # Perform block averaging
@@ -165,34 +167,107 @@ def find_peaks_5(brightness_array, factor=15, threshold=None, filename='estimate
 
 
 
-def peak_filter(points, tolerance=1.5, boundary_factor=2.5):
+def filter_by_relative_distance(points, distance_factor_min=0.2, distance_factor_max=2.0):
     """
-    Filters out points that lie outside an automatically detected boundary or have
-    an unusually large distance to their nearest neighbor.
+    Filters points based on their distances to the nearest neighbors,
+    ensuring only one point from each too-close pair is removed.
 
     Parameters:
-        points (np.ndarray): An (n, 2) array of x and y coordinates.
-        tolerance (float): Multiplier for the standard deviation of distances,
-                           defining outliers based on neighbor distance.
-        boundary_factor (float): Multiplier for the range around the average location,
-                                 defining the allowable boundary for points.
+        points (np.ndarray): Array of shape (n, 2) with x, y coordinates.
+        distance_factor_min (float): Minimum allowable distance as a fraction of the median distance.
+        distance_factor_max (float): Maximum allowable distance as a multiple of the median distance.
 
     Returns:
-        np.ndarray: A filtered (m, 2) array excluding outliers and points outside the
-        detected boundary.
+        np.ndarray: Array of points that pass the relative distance filter.
     """
+    from scipy.spatial import KDTree
+    import numpy as np
 
-    center, std_dev = np.mean(points, axis=0), np.std(points, axis=0)
-    bounds = [(center[i] - boundary_factor * std_dev[i], center[i] + boundary_factor * std_dev[i]) for i in range(2)]  # pylint: disable=line-too-long
+    # Build a KDTree for efficient nearest-neighbor search
+    tree = KDTree(points)
 
+    # Query distances to the two nearest neighbors (excluding the point itself)
+    distances, indices = tree.query(points, k=3)  # [self, nearest neighbor, second-nearest neighbor]
+
+    # Take the distances to the nearest neighbor
+    nearest_distances = distances[:, 1]
+
+    # Calculate the median distance
+    median_distance = np.median(nearest_distances)
+
+    # Define minimum and maximum thresholds
+    min_distance = distance_factor_min * median_distance
+    max_distance = distance_factor_max * median_distance
+    print(f"Median distance: {median_distance:.2f}, Min threshold: {min_distance:.2f}, Max threshold: {max_distance:.2f}")
+
+    # Track points to remove
+    points_to_remove = set()
+
+    for i, point in enumerate(points):
+        # Distances and indices to the two nearest neighbors
+        d1, d2 = distances[i, 1], distances[i, 2]
+        n1, n2 = indices[i, 1], indices[i, 2]
+
+        # Check if the point violates distance thresholds
+        if d1 < min_distance or d2 < min_distance:  # Too close to a neighbor
+            # Choose the point with the higher index to remove (arbitrary but avoids removing both)
+            points_to_remove.add(max(i, n1))
+        elif d1 > max_distance or d2 > max_distance:  # Too far from neighbors
+            points_to_remove.add(i)
+
+    print(f"Points to remove: {points_to_remove}")
+
+    # Filter out points to remove
+    filtered_points = np.array([point for i, point in enumerate(points) if i not in points_to_remove])
+
+    return filtered_points
+
+
+def filter_by_region(points, boundary_factor=3):
+    """
+    Filters points based on their distance to the center of all points.
+
+    Parameters:
+        points (np.ndarray): Array of shape (n, 2) with x, y coordinates.
+        boundary_factor (float): Multiplier for the standard deviation defining the allowable region.
+
+    Returns:
+        np.ndarray: Array of points that pass the region filter.
+    """
+    center = np.mean(points, axis=0)  # Center of all points
+    std_dev = np.std(points, axis=0)  # Standard deviation of the points
+
+    # Define bounds based on the center and standard deviation
+    bounds = [(center[i] - boundary_factor * std_dev[i], center[i] + boundary_factor * std_dev[i]) for i in range(2)]
+
+    # Filter points within bounds
     in_bounds = (bounds[0][0] <= points[:, 0]) & (points[:, 0] <= bounds[0][1]) & \
                 (bounds[1][0] <= points[:, 1]) & (points[:, 1] <= bounds[1][1])
-    points_in_bounds = points[in_bounds]
+    return points[in_bounds]
 
-    distances = KDTree(points_in_bounds).query(points_in_bounds, k=2)[0][:, 1]
 
-    threshold = np.mean(distances) + tolerance * np.std(distances)
-    return points_in_bounds[distances <= threshold]
+def combined_filter(points, distance_factor_min=0.2, distance_factor_max=2.0, boundary_factor=2.5):
+    """
+    Applies distance and region filters to the points.
+
+    Parameters:
+        points (np.ndarray): Array of shape (n, 2) with x, y coordinates.
+        min_distance (float): Minimum allowable distance between neighbors.
+        max_distance (float): Maximum allowable distance between neighbors.
+        boundary_factor (float): Multiplier for the standard deviation defining the allowable region.
+
+    Returns:
+        np.ndarray: Array of points that pass both filters.
+    """
+    # Apply distance filter
+    filtered_points = filter_by_relative_distance(points, distance_factor_min=0.2, distance_factor_max=2.0)
+    print(f"Points after distance filter: {len(filtered_points)}")
+
+    # Apply region filter
+    final_points = filter_by_region(filtered_points, boundary_factor)
+    print(f"Points after region filter: {len(final_points)}")
+
+    return final_points
 
 
 

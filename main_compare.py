@@ -1,14 +1,15 @@
-import file_io
-import intensity_analysis
-from intensity_analysis import compute_center_of_mass_with_uncertainty, fit_gaussian_3d, fit_skewed_gaussian_3d
-from peak_find import find_peaks, peak_filter
+from file_io import *
+from intensity_analysis import *
+#from intensity_analysis import compute_center_of_mass_with_uncertainty, fit_gaussian_3d, fit_skewed_gaussian_3d, non_linear_center_of_mass, center_of_mass_with_threshold
+from peak_find import find_peaks, combined_filter
 from data_compare import calculate_differences
 
-input_folder = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\spot_scale_1\averaged_noise_spots"
+input_folder = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\spot_scale_1\spots_with_backgroundnoise"
 
-#filenames = ("Noise_projection_cam1_scale_1.npy","Noise_projection_cam2_scale_1.npy")
+filenames = ("Noise_projection_cam1_scale_4_bgn_50.npy",
+             "Noise_projection_cam1_scale_8.npy")
 
-def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=6, threshold=None):
+def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=15, threshold=None):
     """
     Detects and processes peaks from `.npy` files in a batch.
 
@@ -35,6 +36,10 @@ def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=6, thresh
         # Detect peaks
         peaks = find_peaks(array, factor=factor, threshold=threshold)
         print(f"Number of peaks found in {filename}: {peaks.shape[0]}")
+        
+        if peaks.shape[0] != 257:
+            peaks = combined_filter(peaks)
+            print(f"Number of peaks after filtering: {peaks.shape[0]}")
 
         # Construct output path for the peaks
         peaks_output_path = os.path.join(output_folder, f"peaks_{os.path.splitext(filename)[0]}.npy")
@@ -49,7 +54,7 @@ def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=6, thresh
         print(f"Created plot: {plot_filename}")
 
 
-#detect_and_verify_peaks_batch(input_folder, factor=8)
+#detect_and_verify_peaks_batch(input_folder, factor=8,threshold=None, filenames=None)
 
 def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
     """
@@ -69,7 +74,9 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
     lpc_methods = {
         "center_of_mass": ("com", lambda data: compute_center_of_mass_with_uncertainty(data)),
         "gauss_fit": ("gf", lambda data: fit_gaussian_3d(data)),
-        "skewed_gauss_fit": ("sgf", lambda data: fit_skewed_gaussian_3d(data))
+        "skewed_gauss_fit": ("sgf", lambda data: fit_skewed_gaussian_3d(data)),
+        "non_linear_center_of_mass": ("nlcom", lambda data: non_linear_center_of_mass(data)),
+        "center_of_mass_with_threshold": ("comwt", lambda data: center_of_mass_with_threshold(data))
     }
 
     if methode not in lpc_methods:
@@ -99,8 +106,7 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
 
         # Create subarrays for LPC calculation
         bsc = brightness_subarray_creator(array, peaks)
-
-        # Calculate LPC coordinates using the selected method
+        
         mean_values = method_function(bsc)[0]
         lpc_coordinates = lpc_calc(mean_values, peaks)
 
@@ -114,24 +120,225 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
         plot_filename = f"lpc_{os.path.splitext(array_filename)[0]}_{method_abbr}.png"
         create_image_plot(array, peaks, lpc_coordinates, output_path=method_folder, output_filename=plot_filename)
         print(f"Plot created for LPC coordinates: {plot_filename}")
-        
+
+#calc_lpc_batch(input_folder, methode="center_of_mass")
+#calc_lpc_batch(input_folder, methode="non_linear_center_of_mass")     
+#calc_lpc_batch(input_folder, methode="center_of_mass_with_threshold")
+#calc_lpc_batch(input_folder, methode="gauss_fit")
 #calc_lpc_batch(input_folder, methode="skewed_gauss_fit")
+        
+import os
+import numpy as np
+import matplotlib.pyplot as plt
 
-filenames_1 = ("lpc_Noise_projection_cam1_scale_2_com.npy",
-               "lpc_Noise_projection_cam1_scale_3_com.npy",
-               "lpc_Noise_projection_cam1_scale_4_com.npy",
-               "lpc_Noise_projection_cam1_scale_5_com.npy",
-               "lpc_Noise_projection_cam1_scale_6_com.npy",
-               "lpc_Noise_projection_cam1_scale_8_com.npy",
-               "lpc_Noise_projection_cam1_scale_10_com.npy")
+def combined_plot_all_methods(input_folder):
+    """
+    Combines contour plots of input intensity data with LPC coordinates 
+    from multiple methods and saves the results.
 
-filenames_2 = ("lpc_Noise_projection_cam2_scale_2_com.npy",
-               "lpc_Noise_projection_cam2_scale_3_com.npy",
-               "lpc_Noise_projection_cam2_scale_4_com.npy",
-               "lpc_Noise_projection_cam2_scale_5_com.npy",
-               "lpc_Noise_projection_cam2_scale_6_com.npy",
-               "lpc_Noise_projection_cam2_scale_8_com.npy",
-               "lpc_Noise_projection_cam2_scale_10_com.npy")
+    Parameters:
+    - input_folder (str): Path to the folder containing `.npy` input files.
+
+    Returns:
+    - None
+    """
+    # Festes Dictionary mit den Methoden und Kürzeln
+    methods_dict = {
+        "center_of_mass": "com",
+        "gauss_fit": "gf",
+        "skewed_gauss_fit": "sgf",
+        "non_linear_center_of_mass": "nlcom",
+        "center_of_mass_with_threshold": "comwt"
+    }
+
+    # Hilfsfunktion: Lade alle `.npy`-Dateien aus einem Ordner
+    def load_all_npy_from_folder(folder):
+        npy_files = sorted([os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".npy")])
+        arrays = [np.load(f) for f in npy_files]
+        return npy_files, arrays
+
+    # Lade Input-Intensitätsdateien
+    input_files, input_arrays = load_all_npy_from_folder(input_folder)
+
+    # Konstruktion des Output-Ordners
+    output_folder = construct_output_path(input_folder)
+    combined_folder = os.path.join(output_folder, "combined_plots")
+    if not os.path.exists(combined_folder):
+        os.makedirs(combined_folder)
+
+    # Lade alle `.npy`-Dateien aus den Methodenordnern
+    method_data = {}
+    for method_name, method_abbr in methods_dict.items():
+        method_folder = os.path.join(output_folder, method_name)
+        if os.path.exists(method_folder):
+            method_files, method_arrays = load_all_npy_from_folder(method_folder)
+            method_data[method_name] = method_arrays
+            print(f"Loaded {len(method_files)} files from method '{method_name}'")
+        else:
+            print(f"Method folder '{method_name}' not found. Skipping.")
+
+    # Erstelle kombinierte Plots
+    for idx, (input_file, input_array) in enumerate(zip(input_files, input_arrays)):
+        print(f"\nCreating combined plot for: {input_file}")
+        base_filename = os.path.splitext(os.path.basename(input_file))[0]
+
+        # Initialize the figure
+        plt.figure(figsize=(10, 8))
+
+        # Plot the intensity data as contour
+        plt.imshow(input_array, cmap='viridis', interpolation='nearest')
+        plt.colorbar(label="Intensity")
+        plt.title(f"Combined Plot for all methods")
+        plt.gca().invert_yaxis()
+        plt.xlim(2145, 2165)
+        plt.ylim(1570, 1595)
+
+        # Add LPC coordinates from all available methods
+        for method_name, method_arrays in method_data.items():
+            if idx < len(method_arrays):  # Verhindere Index-Fehler
+                lpc_coordinates = method_arrays[idx]
+                plt.scatter(lpc_coordinates[:, 0], lpc_coordinates[:, 1], label=method_name, s=10)
+            else:
+                print(f"Warning: Missing data for method '{method_name}' at index {idx}")
+
+        # Add legend and save the plot
+        plt.legend()
+        combined_plot_path = os.path.join(combined_folder, f"{base_filename}_combined.png")
+        plt.savefig(combined_plot_path, dpi=300)
+        plt.close()
+        print(f"Combined plot saved to: {combined_plot_path}")
+        
+#combined_plot_all_methods(input_folder)
+        
+def combined_plot_all_methods_with_slices(input_folder):
+    """
+    Combines sliced brightness data with LPC coordinates from multiple methods,
+    sums up the slices, and creates combined plots.
+
+    Parameters:
+    - input_folder (str): Path to the folder containing `.npy` input files.
+
+    Returns:
+    - None
+    """
+    import os
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    # Festes Dictionary mit den Methoden und Kürzeln
+    methods_dict = {
+        "center_of_mass": "com",
+        "gauss_fit": "gf",
+        "skewed_gauss_fit": "sgf",
+        "non_linear_center_of_mass": "nlcom",
+        "center_of_mass_with_threshold": "comwt"
+    }
+
+    # Hilfsfunktion: Lade alle `.npy`-Dateien aus einem Ordner
+    def load_all_npy_from_folder(folder):
+        npy_files = sorted([os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".npy")])
+        arrays = [np.load(f) for f in npy_files]
+        return npy_files, arrays
+
+    # Lade Input-Intensitätsdateien
+    input_files, input_arrays = load_all_npy_from_folder(input_folder)
+
+    # Konstruktion des Output-Ordners
+    output_folder = construct_output_path(input_folder)
+    combined_folder = os.path.join(output_folder, "combined_plots")
+    if not os.path.exists(combined_folder):
+        os.makedirs(combined_folder)
+
+    # Lade alle `.npy`-Dateien aus den Methodenordnern
+    method_data = {}
+    for method_name, method_abbr in methods_dict.items():
+        method_folder = os.path.join(output_folder, method_name)
+        if os.path.exists(method_folder):
+            method_files, method_arrays = load_all_npy_from_folder(method_folder)
+            method_data[method_name] = method_arrays
+            print(f"Loaded {len(method_files)} files from method '{method_name}'")
+        else:
+            print(f"Method folder '{method_name}' not found. Skipping.")
+
+    # Erstelle kombinierte Plots
+    for idx, (input_file, input_array) in enumerate(zip(input_files, input_arrays)):
+        print(f"\nProcessing input file: {input_file}")
+        base_filename = os.path.splitext(os.path.basename(input_file))[0]
+    
+        for method_name, method_arrays in method_data.items():
+            if idx >= len(method_arrays):
+                print(f"Warning: Missing data for method '{method_name}' at index {idx}")
+                continue
+    
+            # Peaks für die aktuelle Methode und Datei
+            peaks = method_arrays[idx]
+            
+            # Koordinaten runden
+            rounded_peaks = np.round(peaks).astype(int)
+    
+            # Helligkeitsscheiben erstellen
+            slices = brightness_subarray_creator(input_array, rounded_peaks)
+    
+            # Summiere alle Scheiben, um ein 2D-Array zu erstellen
+            # Summiere alle Scheiben, um ein 2D-Array zu erstellen
+            def get_zoomed_slice(array, target_size):
+                h, w = array.shape
+                if h < target_size or w < target_size:
+                    raise ValueError(f"Array shape {array.shape} is smaller than the target zoom size {target_size}")
+                
+                center_x, center_y = w // 2, h // 2  # Mittelpunkt des Arrays
+                half_size = target_size // 2
+                
+                # Berechnung der Grenzen
+                x_start, x_end = center_x - half_size, center_x + half_size
+                y_start, y_end = center_y - half_size, center_y + half_size
+                
+                return array[y_start:y_end, x_start:x_end]
+            
+            # Summiere alle Scheiben, um ein 2D-Array zu erstellen
+            summed_slices = slices.sum(axis=0)
+            
+            # Sicherstellen, dass das Array numerisch ist
+            summed_slices = np.nan_to_num(summed_slices, nan=0.0, posinf=0.0, neginf=0.0).astype(float)
+            
+            # Dynamisch auf die Mitte mit 50x50 zoomen (oder gewünschter Größe)
+            zoomed_slices = get_zoomed_slice(summed_slices, target_size=30)
+            
+            # Debugging: Ausgabe der Shape und Werte
+            print(f"Zoomed slices shape: {zoomed_slices.shape}")
+            print(f"Zoomed slices dtype: {zoomed_slices.dtype}, min: {np.min(zoomed_slices)}, max: {np.max(zoomed_slices)}")
+            
+            # Plotten
+            plt.figure(figsize=(8, 6))
+            plt.imshow(zoomed_slices, cmap="viridis", interpolation="nearest")
+            plt.colorbar(label="Summed Intensity")
+            #plt.title(f"Zoomed Summed Intensity for {base_filename} - {method_name}")
+            plt.gca().invert_yaxis()
+    
+            # Plot speichern
+            plot_filename = f"{base_filename}_{method_name}_summed.png"
+            plot_path = os.path.join(combined_folder, plot_filename)
+            plt.savefig(plot_path, dpi=300)
+            plt.close()
+            print(f"Saved plot for {method_name}: {plot_path}")
+
+#combined_plot_all_methods_with_slices(input_folder)
+
+filenames_1 = ("lpc_Noise_projection_cam1_scale_2_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_3_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_4_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_5_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_6_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_8_nlcom.npy",
+               "lpc_Noise_projection_cam1_scale_10_nlcom.npy")
+
+filenames_2 = ("lpc_Noise_projection_cam1_scale_2_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_3_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_4_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_5_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_6_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_8_comwt.npy",
+               "lpc_Noise_projection_cam1_scale_10_comwt.npy")
 
 filenames_3 = ("lpc_Noise_projection_cam1_scale_2_gf.npy",
                "lpc_Noise_projection_cam1_scale_3_gf.npy",
@@ -141,13 +348,13 @@ filenames_3 = ("lpc_Noise_projection_cam1_scale_2_gf.npy",
                "lpc_Noise_projection_cam1_scale_8_gf.npy",
                "lpc_Noise_projection_cam1_scale_10_gf.npy")
 
-filenames_4 = ("lpc_Noise_projection_cam2_scale_2_gf.npy",
-               "lpc_Noise_projection_cam2_scale_3_gf.npy",
-               "lpc_Noise_projection_cam2_scale_4_gf.npy",
-               "lpc_Noise_projection_cam2_scale_5_gf.npy",
-               "lpc_Noise_projection_cam2_scale_6_gf.npy",
-               "lpc_Noise_projection_cam2_scale_8_gf.npy",
-               "lpc_Noise_projection_cam2_scale_10_gf.npy")
+filenames_4 = ("lpc_Noise_projection_cam1_scale_2_com.npy",
+               "lpc_Noise_projection_cam1_scale_3_com.npy",
+               "lpc_Noise_projection_cam1_scale_4_com.npy",
+               "lpc_Noise_projection_cam1_scale_5_com.npy",
+               "lpc_Noise_projection_cam1_scale_6_com.npy",
+               "lpc_Noise_projection_cam1_scale_8_com.npy",
+               "lpc_Noise_projection_cam1_scale_10_com.npy")
 
 filenames_5 = ("lpc_Noise_projection_cam1_scale_2_sgf.npy",
                "lpc_Noise_projection_cam1_scale_3_sgf.npy",
@@ -164,6 +371,8 @@ filenames_6 = ("lpc_Noise_projection_cam2_scale_2_sgf.npy",
                "lpc_Noise_projection_cam2_scale_6_sgf.npy",
                "lpc_Noise_projection_cam2_scale_8_sgf.npy",
                "lpc_Noise_projection_cam2_scale_10_sgf.npy")
+
+
         
 def compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames=None, abs_values=False, plot_type="all"):
     """
@@ -182,8 +391,8 @@ def compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames
     import os
 
     # Hard-coded path to theoretical data
-    theoretical_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\spot_scale_1\averaged_noise_spots"
-    theoretical_filename = "projection_cam2_scale_1.npy"
+    theoretical_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\simulated_data\simulated_data"
+    theoretical_filename = "projection_rho_0_phi_0_cam1.npy"
 
     # Construct the method folder path
     output_folder = construct_output_path(input_folder)
@@ -241,15 +450,107 @@ def compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames
 
     print(f"Comparison completed. Results saved in: {result_folder}")
 
+filenames_7 = ("lpc_tcam_11_image_1_comwt.npy")
+filenames_8 = ("lpc_tcam_11_image_1_nlcom.npy")
+filenames_9 = ("lpc_tcam_11_image_1_com.npy")
+filenames_10 = ("lpc_tcam_11_image_1_gf.npy")
+filenames_11 = ("lpc_tcam_11_image_1_sgf.npy")
 
+#compare_lpc_to_theoretical(input_folder, methode="center_of_mass_with_threshold", filenames=filenames_2, plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="non_linear_center_of_mass", filenames=filenames_1, plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames=filenames_4, plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="gauss_fit", filenames=filenames_3, plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="skewed_gauss_fit", filenames=filenames_5, plot_type="norm")
 #compare_lpc_to_theoretical(input_folder, methode="skewed_gauss_fit", filenames=filenames_6, plot_type="norm")
 
+def compare_folders_lpc(input_folder, theoretical_folder=None, scale_factor=5, methode="center_of_mass", filenames=None, abs_values=True, plot_type="norm"):
+    """
+    Vergleicht LPC-Daten aus einem Messordner mit theoretischen Werten aus einem zweiten Ordner.
 
+    Parameters:
+    - input_folder (str): Pfad zum Ordner mit Messdaten.
+    - theoretical_folder (str): Pfad zum Ordner mit theoretischen Daten (falls None, ein Standardpfad wird verwendet).
+    - scale_factor (int): Skalierungsfaktor, um theoretische Daten anzupassen.
+    - methode (str): Methode zur LPC-Berechnung. Optionen: "center_of_mass", "gauss_fit", "skewed_gauss_fit".
+    - filenames (list or None): Liste von LPC-Dateinamen. Wenn None, werden alle `.npy`-Dateien verarbeitet.
+    - abs_values (bool): Ob absolute Differenzen berechnet werden sollen (Standard: False).
+    - plot_type (str): Art der Plots, die erzeugt werden sollen. Optionen: "x", "y", "z", "norm", "all" (Standard: "all").
+
+    Returns:
+    - None
+    """
+    import os
+
+    # Hard-coded path to theoretical data
+    if theoretical_folder is None:
+        theoretical_folder = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\spot_scale_1\diff_dis_10_add_noise\center_of_mass"
+
+    # Construct the method folder path
+    output_folder = construct_output_path(input_folder)
+    method_folder = os.path.join(output_folder, methode)
+
+    if not os.path.exists(method_folder):
+        raise ValueError(f"Der Pfad für die Methode '{methode}' existiert nicht: {method_folder}")
+
+    # Load LPC files and theoretical files
+    lpc_files, lpc_arrays = load_all_npy_files(method_folder, filenames=filenames)
+    theoretical_files, theoretical_arrays = load_all_npy_files(theoretical_folder, filenames=filenames)
+
+    # Ensure the number of files matches
+    if len(lpc_files) != len(theoretical_files):
+        raise ValueError(f"Anzahl der Dateien stimmt nicht überein: {len(lpc_files)} Messdaten vs. {len(theoretical_files)} theoretische Daten.")
+
+    # Ensure output folder for results exists
+    result_folder = os.path.join(method_folder, "comparison_results")
+    if not os.path.exists(result_folder):
+        os.makedirs(result_folder)
+
+    # Process each file pair
+    for lpc_file, lpc_array, theoretical_file, theoretical_array in zip(lpc_files, lpc_arrays, theoretical_files, theoretical_arrays):
+        print(f"Processing LPC file: {lpc_file} with theoretical file: {theoretical_file}")
+
+        # Check shape compatibility
+        if lpc_array.shape != theoretical_array.shape:
+            raise ValueError(f"Shape mismatch: {lpc_file} (shape {lpc_array.shape}) "
+                             f"and {theoretical_file} (shape {theoretical_array.shape}).")
+
+        # Scale theoretical data
+        scaled_theoretical = theoretical_array / scale_factor
+
+        # Compute differences
+        differences = calculate_differences(scaled_theoretical, lpc_array)
+        if abs_values:
+            differences = np.abs(differences)
+
+        # Save differences
+        diff_filename = f"diff_{lpc_file}"
+        diff_filepath = os.path.join(result_folder, diff_filename)
+        np.save(diff_filepath, differences)
+        print(f"Differences saved to: {diff_filepath}")
+
+        # Plot differences
+        plot_filename = f"plot_{os.path.splitext(diff_filename)[0]}.png"
+        plot_differences_as_bar_chart(
+            differences,
+            output_path=result_folder,
+            plot_type=plot_type,
+            abs_values=abs_values,
+            output_filename=plot_filename
+        )
+        print(f"Plot created: {plot_filename}")
+
+        # Compute and log mean differences
+        mean_diff = np.mean(differences, axis=0)
+        print(f"Mean differences for {lpc_file}: {mean_diff}")
+
+    print(f"Comparison completed. Results saved in: {result_folder}")
+
+#compare_folders_lpc(input_folder, methode="skewed_gauss_fit")
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-def plot_means_with_error(results, input_folder, x_values=None, title="Means with Standard Deviation", xlabel="X-Axis", ylabel="Mean Norm", save_plot=True):
+def plot_means_with_error(results, input_folder, x_values=None, save_plot=True):
     """
     Plots means with standard deviations as error bars for multiple methods and optionally saves the plot.
     
@@ -293,13 +594,13 @@ def plot_means_with_error(results, input_folder, x_values=None, title="Means wit
             y=means,
             yerr=stds,
             label=method,
-            fmt='o', capsize=5
+            fmt='o', capsize=9
         )
 
     # Plot customization
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    #plt.title(r"Mean deviation from theretical values over laser Spo")
+    plt.xlabel(r"Measuring distance in m")
+    plt.ylabel(r"Mean deviation from input values in pixels")
     plt.legend(title="Methods")
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.tight_layout()  # Ensures the plot fits nicely
@@ -310,7 +611,7 @@ def plot_means_with_error(results, input_folder, x_values=None, title="Means wit
         output_path = os.path.join(construct_output_path(input_folder), 'plots')
         os.makedirs(output_path, exist_ok=True)  # Create directory if it doesn't exist
         plot_filename = os.path.join(output_path, "comparison_plot.png")
-        plt.savefig(plot_filename)
+        plt.savefig(plot_filename, dpi=300)
         print(f"Plot saved to: {plot_filename}")
     
     # Display the plot
@@ -332,7 +633,9 @@ def process_comparison_results(input_folder):
     lpc_methods = {
         "center_of_mass": ("com", lambda data: compute_center_of_mass_with_uncertainty(data)),
         "gauss_fit": ("gf", lambda data: fit_gaussian_3d(data)),
-        "skewed_gauss_fit": ("sgf", lambda data: fit_skewed_gaussian_3d(data))
+        "skewed_gauss_fit": ("sgf", lambda data: fit_skewed_gaussian_3d(data)),
+        "non_linear_center_of_mass": ("nlcom", lambda data: non_linear_center_of_mass(data)),
+        "center_of_mass_with_threshold": ("comwt", lambda data: center_of_mass_with_threshold(data))
     }
 
     # Speicherstruktur für die Ergebnisse
@@ -400,6 +703,8 @@ def process_comparison_results_with_plot(input_folder, x_values=None):
     return results
 
 
-x_values = np.array([5, 25, 50/3, 50/4, 10, 50/6, 50/8, 5, 25, 50/3, 50/4, 10, 50/6, 50/8])
+x_values = np.array([5, 25, 50/3, 50/4, 10, 50/6, 50/8])
+#x_values = np.array([10, 20, 30, 40, 50, 10, 20, 30, 40, 50])
+#x_values = np.array([0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50])
 
 process_comparison_results_with_plot(input_folder, x_values=x_values)

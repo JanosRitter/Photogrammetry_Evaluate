@@ -1,9 +1,9 @@
 import file_io
 import intensity_analysis
-from peak_find import find_peaks_7, peak_filter
+from peak_find import find_peaks, combined_filter
 
 
-inputpath = r"example_set_1\example_5"
+inputpath = r"example_set_1\example_6"
 
 def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     """
@@ -20,10 +20,10 @@ def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     """
     brightness_array_1, brightness_array_2 = load_brightness_arrays(inputpath)
 
-    peaks_1 = find_peaks_7(brightness_array_1, factor=factor, threshold=threshold)
+    peaks_1 = find_peaks(brightness_array_1, factor=factor, threshold=threshold)
     print("Number of peaks found in Array 1:", peaks_1.shape[0])
     
-    peaks_2 = find_peaks_7(brightness_array_2, factor=factor, threshold=threshold)
+    peaks_2 = find_peaks(brightness_array_2, factor=factor, threshold=threshold)
     print("Number of peaks found in Array 2:", peaks_2.shape[0])
 
     if peaks_1.shape[0] == peaks_2.shape[0]:
@@ -34,8 +34,8 @@ def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     filter_prompt = input("Do you want to apply filtering? (yes/no): ").strip().lower()
     if filter_prompt == "yes":
         print("Applying filtering...")
-        peaks_1 = peak_filter(peaks_1)
-        peaks_2 = peak_filter(peaks_2)
+        peaks_1 = combined_filter(peaks_1)
+        peaks_2 = combined_filter(peaks_2)
         print("Filtering complete.")
         print("Number of peaks found in Array 1:", peaks_1.shape[0])
         print("Number of peaks found in Array 2:", peaks_2.shape[0])
@@ -54,8 +54,8 @@ def detect_and_verify_peaks(inputpath, factor=8, threshold=None):
     
     print("Peaks were saved.")
         
-    create_image_plot(brightness_array_1, peaks_1, input_path=inputpath, peaks_name="peaks_1")
-    create_image_plot(brightness_array_2, peaks_2, input_path=inputpath, peaks_name="peaks_2")
+    #create_image_plot(brightness_array_1, peaks_1, input_path=inputpath, peaks_name="peaks_1")
+    #create_image_plot(brightness_array_2, peaks_2, input_path=inputpath, peaks_name="peaks_2")
     
 detect_and_verify_peaks(inputpath)
     

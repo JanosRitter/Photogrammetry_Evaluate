@@ -1,4 +1,6 @@
 from .gauss_fit import fit_gaussian_3d
 from .skew_gauss_fit import fit_skewed_gaussian_3d
 from .center_of_mass import compute_center_of_mass_with_uncertainty
+from .non_linear_center_of_mass import non_linear_center_of_mass
+from .center_of_mass_with_threshold import center_of_mass_with_threshold
 from .utility import brightness_subarray_creator, subtract_mean_background, lpc_calc

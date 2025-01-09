@@ -2,10 +2,11 @@
 This module contains different plotting routines for contour, 2D and 3D plots
 """
 import os
-os.chdir('C:/Users/Janos/Documents/Masterarbeit/3D_scanner/Pythoncode')
 import numpy as np
 import matplotlib.pyplot as plt
-from file_io.utility import construct_output_path
+import seaborn as sns
+
+os.chdir('C:/Users/Janos/Documents/Masterarbeit/3D_scanner/Pythoncode')
 
 def plot_brightness_array(brightness_array, x_limit=None, y_limit=None, save_path=None):
     """
@@ -69,8 +70,6 @@ def create_contour_plot(data, save_path=None):
     plt.colorbar(label='Brightness')
     plt.xlabel('X')
     plt.ylabel('Y')
-    #plt.xlim(500,2500)
-    #plt.ylim(1000, 2500)
     if save_path:
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"Contour plot saved at: {save_path}")
@@ -122,6 +121,7 @@ def create_image_plot(data, peaks=None, mean=None, output_path=None, output_file
         print(f"Image plot saved at: {save_path}")
     else:
         print("Output path not provided. Plot not saved.")
+        plt.show()
 
     plt.close()
 
@@ -191,9 +191,10 @@ def plot_2d_points_pair(points_2d_1, points_2d_2, title='2D Scatter Plot of Two 
 def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
     """
     Plots 3D points using matplotlib and saves the plot to a specified path.
-    
+
     Parameters:
-        - points_3d (np.ndarray): A (n, 3) array containing the 3D coordinates of the points (X, Y, Z).
+        - points_3d (np.ndarray): A (n, 3) array containing the 3D
+        coordinates of the points (X, Y, Z).
         - pfad (str): The directory path where the plot will be saved.
         - dateiname (str): The name of the file to save the plot (default: "3d_plot.png").
     """
@@ -207,15 +208,12 @@ def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
     axis.set_xlabel('X')
     axis.set_ylabel('Y')
     axis.set_zlabel('Z')
-    axis.set_title("3D Scatter Plot")  # Der Titel bleibt fest.
+    axis.set_title("3D Scatter Plot")
 
 
     if path:
-        # Vollständigen Pfad erstellen
         save_path = os.path.join(path, dateiname)
-        # Sicherstellen, dass der Ordner existiert
         os.makedirs(path, exist_ok=True)
-        # Plot speichern
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"3D plot saved at: {save_path}")
 
@@ -229,66 +227,53 @@ def plot_differences_as_bar_chart(differences, output_path, plot_type="all", abs
     Plots the differences (x, y, and optionally z) as bar charts and/or the Euclidean norm.
 
     Parameters:
-    - differences (np.ndarray): Array of shape (n, 2) or (n, 3) containing the (x, y, z) differences.
+    - differences (np.ndarray): Array of shape (n, 2) or (n, 3) containing
+    the (x, y, z) differences.
     - output_path (str): Path to the output directory for saving the plots.
-    - plot_type (str): Type of differences to plot. Options: "x", "y", "z", "norm", "all" (default: "all").
-    - abs_values (bool): Whether to plot the absolute values of the differences (default: False).
-    - output_filename (str): Name of the output file (default: "differences_plot.png").
+    - plot_type (str): Type of differences to plot. Options:
+        "x", "y", "z", "norm", "all" (default: "all").
+    - abs_values (bool): Whether to plot the absolute values
+    of the differences (default: False).
+    - output_filename (str): Name of the output file
+    (default: "differences_plot.png").
     """
     if differences.shape[1] not in {2, 3}:
         raise ValueError("Input array must have shape (n, 2) or (n, 3).")
 
-    if abs_values:
-        differences = np.abs(differences)
+    data = np.abs(differences) if abs_values else differences
 
-    x_diff = differences[:, 0]
-    y_diff = differences[:, 1]
-    z_diff = differences[:, 2] if differences.shape[1] == 3 else None
+    labels = ["x", "y", "z"][:data.shape[1]]
+    available_plots = {label: data[:, i] for i, label in enumerate(labels)}
+    available_plots["norm"] = np.linalg.norm(differences, axis=1)
 
-    # Calculate Euclidean norm
-    norm = np.linalg.norm(differences, axis=1)
-
-    # Define plots based on plot_type
-    available_plots = {
-        "x": x_diff,
-        "y": y_diff,
-        "z": z_diff,
-        "norm": norm
-    }
     if plot_type == "all":
-        plot_keys = ["x", "y", "z", "norm"] if z_diff is not None else ["x", "y", "norm"]
+        plot_keys = list(available_plots.keys())
     elif plot_type in available_plots:
         plot_keys = [plot_type]
     else:
-        raise ValueError(f"Invalid plot_type: {plot_type}. Choose from 'x', 'y', 'z', 'norm', 'all'.")
+        raise ValueError(f"Invalid plot_type: {plot_type}. Choose from {list(available_plots.keys()) + ['all']}.")
 
-    # Ensure output folder exists
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
+    os.makedirs(output_path, exist_ok=True)
 
-    # Create a plot for each selected type
-    for key in plot_keys:
-        if available_plots[key] is None:  # Skip if "z" is requested but not available
-            continue
-
+    def save_bar_chart(data, label, filename):
         plt.figure(figsize=(10, 6))
-        plt.bar(range(len(available_plots[key])), available_plots[key], color='blue', alpha=0.7)
+        plt.bar(range(len(data)), data, color='blue', alpha=0.7)
         plt.xlabel("Index")
-        plt.ylabel(f"{key.capitalize()} Differences")
-        plt.title(f"{key.capitalize()} Differences (absolute)" if abs_values else f"{key.capitalize()} Differences")
+        plt.ylabel(f"{label.capitalize()} Differences")
+        plt.title(f"{label.capitalize()} Differences (absolute)" if abs_values else f"{label.capitalize()} Differences")
         plt.grid(True, linestyle='--', alpha=0.6)
-
-        # Save plot
-        save_filename = f"{key}_{output_filename}"
-        save_path = os.path.join(output_path, save_filename)
-        plt.savefig(save_path, dpi=300)
-        print(f"Plot saved as {save_path}")
+        plt.savefig(filename, dpi=300)
         plt.close()
+        print(f"Plot saved as {filename}")
 
-    # Save combined plot if "all" is selected
+    for key in plot_keys:
+        save_bar_chart(available_plots[key], key, os.path.join(output_path, f"{key}_{output_filename}"))
+
     if plot_type == "all":
-        num_plots = len(plot_keys)
-        fig, axes = plt.subplots(num_plots, 1, figsize=(10, 4 * num_plots), sharex=True)
+        _, axes = plt.subplots(len(plot_keys), 1, figsize=(10, 4 * len(plot_keys)), sharex=True)
+
+        if len(plot_keys) == 1:
+            axes = [axes]
 
         for idx, key in enumerate(plot_keys):
             axes[idx].bar(range(len(available_plots[key])), available_plots[key], color='blue', alpha=0.7)
@@ -301,5 +286,40 @@ def plot_differences_as_bar_chart(differences, output_path, plot_type="all", abs
 
         save_path = os.path.join(output_path, f"all_{output_filename}")
         plt.savefig(save_path, dpi=300)
-        print(f"Combined plot saved as {save_path}")
         plt.close()
+        print(f"Combined plot saved as {save_path}")
+
+
+
+
+def analyze_background_noise(data, bins=256, hist_title="Value Frequency Histogram"):
+    """
+    Analyzes the background noise in a (n, m) array by generating a histogram and boxplot.
+
+    Parameters:
+    - data (np.ndarray): Input array of shape (n, m) containing the data to analyze.
+    - bins (int): Number of bins for the histogram. Default is 50.
+    - hist_title (str): Title for the histogram plot.
+    - boxplot_title (str): Title for the boxplot.
+
+    Returns:
+    - None
+    """
+    flattened_data = data.flatten()
+
+    plt.figure(figsize=(12, 6))
+    plt.subplot(1, 2, 1)
+    plt.hist(flattened_data, bins=bins, color='skyblue', edgecolor='black', alpha=0.7)
+    plt.title(hist_title)
+    plt.xlabel("Value")
+    plt.ylabel("Frequency")
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+    plt.subplot(1, 2, 2)
+    sns.boxplot(x=flattened_data, color='lightgreen', orient="h")
+    plt.title("Boxplot of Values")
+    plt.xlabel("Value")
+
+
+    plt.tight_layout()
+    plt.show()
