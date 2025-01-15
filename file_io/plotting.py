@@ -5,6 +5,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from file_io.utility import construct_output_path
 
 os.chdir('C:/Users/Janos/Documents/Masterarbeit/3D_scanner/Pythoncode')
 
@@ -216,6 +217,8 @@ def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
         os.makedirs(path, exist_ok=True)
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"3D plot saved at: {save_path}")
+    else:
+        plt.show()
 
     plt.close()
 
@@ -322,4 +325,49 @@ def analyze_background_noise(data, bins=256, hist_title="Value Frequency Histogr
 
 
     plt.tight_layout()
+    plt.show()
+
+def plot_all_methods(results, x_values=None, input_folder=None, save_plot=True):
+    """
+    Plot mean values with standard deviations for multiple methods.
+
+    Parameters:
+    - results (dict): Dictionary containing mean and standard deviation values for each method.
+    - x_values (np.ndarray or None): X-values for the plot.
+    - input_folder (str): Folder for saving the plot.
+    - save_plot (bool): Whether to save the plot as an image file.
+    """
+    import matplotlib.pyplot as plt
+
+    plt.figure(figsize=(10, 6))
+
+    for method, data in results.items():
+        means = data["means"]
+        stds = data["stds"]
+
+        if x_values is None:
+            x_values = np.arange(len(means))
+
+        plt.errorbar(
+            x=x_values,
+            y=means,
+            yerr=stds,
+            label=method,
+            fmt='o',
+            capsize=9
+        )
+
+    plt.xlabel("Laser spot size in pixels")
+    plt.ylabel("Mean deviation from input structure in m")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.tight_layout()
+
+    if save_plot and input_folder:
+        output_path = os.path.join(construct_output_path(input_folder), "plots")
+        os.makedirs(output_path, exist_ok=True)
+        plot_filename = "comparison_plot_all_methods.png"
+        plt.savefig(os.path.join(output_path, plot_filename), dpi=300)
+        print(f"Plot saved in: {output_path}")
+
     plt.show()

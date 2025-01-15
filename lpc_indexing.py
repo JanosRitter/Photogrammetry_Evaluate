@@ -9,9 +9,6 @@ from scipy.spatial.distance import pdist, squareform
 import numpy as np
 
 
-
-
-
 def find_outlier_point(coords, k=3):
     """
     Findet den Ausreißerpunkt in den Koordinaten, der am weitesten von
@@ -33,8 +30,6 @@ def find_outlier_point(coords, k=3):
     deviations = np.abs(avg_min_distances - median_distance)
     outlier_index = np.argmax(deviations)
     return coords[outlier_index], outlier_index
-
-
 
 
 def calculate_rotation_angle(coords):
@@ -102,7 +97,7 @@ def rotate_coordinates(coords):
 
 def compute_grid_size(coords, k=3):
     """
-    Computes the typical grid size for a nearly square grid by analyzing the median 
+    Computes the typical grid size for a nearly square grid by analyzing the median
     distance to the k nearest neighbors, excluding the identified outlier.
 
     Parameters:
@@ -118,20 +113,20 @@ def compute_grid_size(coords, k=3):
     np.fill_diagonal(distances, np.inf)
     k_smallest_distances = np.sort(distances, axis=1)[:, :k]
     grid_size = np.median(np.mean(k_smallest_distances, axis=1))
-    
-    print(f"Computed grid size: {grid_size}")  # Hier wird die berechnete Grid-Größe ausgegeben.
-    
+
+    print(f"Computed grid size: {grid_size}")
+
     return grid_size
 
 
 def assign_grid_indices(coords, k=3):
     """
-    Assigns grid indices to points based on a grid where the outlier is positioned 
+    Assigns grid indices to points based on a grid where the outlier is positioned
     at the corner of four central cells, forming a chessboard-like grid.
 
     Parameters:
         coords (np.ndarray): Array of shape (n, 2) representing 2D coordinates.
-        k (int): Number of nearest neighbors to consider for outlier detection 
+        k (int): Number of nearest neighbors to consider for outlier detection
                  and grid size computation.
 
     Returns:
@@ -145,13 +140,10 @@ def assign_grid_indices(coords, k=3):
     grid_size = compute_grid_size(coords, k)
     origin = coords[outlier_idx]
 
-    # Shift all points relative to the outlier point
     relative_positions = coords - origin
 
-    # Compute grid indices using custom rounding logic
     grid_indices = custom_round(relative_positions / grid_size)
 
-    # Assign (0, 0) specifically to the outlier
     grid_indices[outlier_idx] = [0, 0]
 
     return np.hstack((coords, grid_indices))
@@ -206,12 +198,12 @@ def custom_round(values):
 
 def analyze_coordinates(coords, k=3):
     """
-    Analyzes a set of 2D coordinates and assigns grid-based indices, identifying 
+    Analyzes a set of 2D coordinates and assigns grid-based indices, identifying
     an outlier point as the grid origin. Ensures proper alignment and validates index uniqueness.
 
     Parameters:
         coords (np.ndarray): Array of shape (n, 2) representing 2D coordinates.
-        k (int): Number of nearest neighbors to consider for outlier detection 
+        k (int): Number of nearest neighbors to consider for outlier detection
                  and grid size computation.
 
     Returns:
