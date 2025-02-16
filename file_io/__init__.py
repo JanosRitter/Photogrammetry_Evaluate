@@ -37,6 +37,6 @@ This package is designed to simplify file handling and visualization tasks,
 especially for `.npy` files and related plotting workflows.
 """
 
-from .npy_processing import load_brightness_arrays, save_array_as_npy, load_npy_file, load_all_npy_files
+from .npy_processing import load_brightness_arrays, save_array_as_npy, load_npy_file, load_all_npy_files, convert_png_to_npy
 from .plotting import plot_brightness_array, create_contour_plot, create_image_plot, plot_3d_points, plot_differences_as_bar_chart
-from .utility import ensure_output_path, construct_output_path
+from .utility import ensure_output_path, construct_output_path, construct_flex_op_path

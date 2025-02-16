@@ -49,3 +49,46 @@ def construct_output_path(input_path, base_folder="output", filename=None):
     if filename:
         return os.path.join(output_path, filename)
     return output_path
+
+
+
+def construct_flex_op_path(input_path, base_folder="output", filename=None):
+    """
+    Erzeugt einen Output-Pfad basierend auf einem gegebenen Input-Pfad.
+    Die Funktion erkennt automatisch den übergeordneten 'input_output'-Ordner
+    und spiegelt die Unterordnerstruktur unter einem neuen Basisordner ('output').
+
+    Parameters:
+        - input_path (str): Absoluter Pfad zur Input-Datei.
+        - base_folder (str): Name des neuen Basisordners (default: "output").
+        - filename (str): Optionaler Dateiname für den Output.
+
+    Returns:
+        - str: Generierter Output-Pfad mit der gleichen Ordnerstruktur.
+    """
+    input_path = os.path.abspath(input_path)  # Absoluten Pfad sicherstellen
+
+    # Suche nach dem 'input_output'-Ordner in der Pfadhierarchie
+    path_parts = input_path.split(os.sep)
+    if "input_output" not in path_parts:
+        raise ValueError("Der 'input_output'-Ordner konnte im Pfad nicht gefunden werden.")
+
+    idx = path_parts.index("input_output")  # Index des 'input_output'-Ordners
+    base_dir = os.sep.join(path_parts[:idx+1])  # Der gesamte Pfad bis 'input_output'
+
+    # Ersetze 'input' durch den gewünschten Basisordner (z. B. 'output')
+    rel_path = os.sep.join(path_parts[idx+2:])  # Relativer Pfad nach 'input'
+    output_path = os.path.join(base_dir, base_folder, rel_path)
+
+    # Falls der Pfad eine Datei war, das letzte Element als Dateiname extrahieren
+    if filename is None and os.path.splitext(output_path)[1]:  # Falls eine Dateiendung existiert
+        output_path, filename = os.path.split(output_path)
+
+    # Sicherstellen, dass das Output-Verzeichnis existiert
+    os.makedirs(output_path, exist_ok=True)
+
+    # Falls ein Dateiname angegeben ist, füge ihn zum Pfad hinzu
+    if filename:
+        return os.path.join(output_path, filename)
+    
+    return output_path

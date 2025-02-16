@@ -69,7 +69,7 @@ def block_average(brightness_array, factor=15):
 
 
 
-def find_peaks(brightness_array, factor=15, threshold=None, window_size=7):
+def find_peaks(brightness_array, factor=10, threshold=None, window_size=9):
     """
     Finds the maximum points in a specified subarray and applies a threshold to filter noise.
 
@@ -92,7 +92,7 @@ def find_peaks(brightness_array, factor=15, threshold=None, window_size=7):
     if threshold is None:
         mean_value = np.mean(brightness_array)
         std_dev = np.std(brightness_array)
-        threshold = mean_value + (std_dev / 2)
+        threshold = mean_value + (2 * std_dev)
         print(f"Threshold automatically calculated as: {threshold}")
 
     # Perform block averaging

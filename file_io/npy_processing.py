@@ -102,6 +102,29 @@ def save_array_as_npy(array, file_path, file_name):
 
 
 
+def convert_png_to_npy(folder_path):
+    """
+    Converts all PNG images in the specified folder to NumPy arrays representing brightness values (0-255) and
+    saves them as .npy files in the same directory.
+
+    Parameters:
+        - folder_path (str): Path to the directory containing PNG files.
+    """
+    png_files = [f for f in os.listdir(folder_path) if f.lower().endswith('.png')]
+    
+    for file_name in png_files:
+        img_path = os.path.join(folder_path, file_name)
+        npy_path = img_path.replace('.png', '.npy')
+        
+        img = Image.open(img_path).convert('RGB')
+        brightness_array = np.mean(np.array(img), axis=2).astype(np.uint8)
+        
+        print(brightness_array.shape)
+        
+        np.save(npy_path, brightness_array)
+
+
+
 
 def load_npy_file(filepath, filename):
     """

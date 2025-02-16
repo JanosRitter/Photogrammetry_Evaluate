@@ -52,10 +52,10 @@ def generate_xy_pattern(
 # Example usage
 save_dir = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\sim_dat_large_scale"
 
-scale_factors = [1]
+scale_factors = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 25, 30, 40, 50]
 generate_xy_pattern(
     size_x=10, 
-    scale=50.0, 
+    scale=50.1, 
     scale_factors=scale_factors, 
     save_dir=save_dir
 )

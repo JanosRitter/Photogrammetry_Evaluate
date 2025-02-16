@@ -9,7 +9,7 @@ from peak_find import find_peaks, combined_filter
 from data_compare import calculate_differences
 
 
-def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=15, threshold=None):
+def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=10, threshold=None):
     """
     Detects and processes peaks from `.npy` files in a batch.
 
@@ -66,7 +66,8 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
         "gauss_fit": ("gf", lambda data: fit_gaussian_3d(data)),
         "skewed_gauss_fit": ("sgf", lambda data: fit_skewed_gaussian_3d(data)),
         "non_linear_center_of_mass": ("nlcom", lambda data: non_linear_center_of_mass(data)),
-        "center_of_mass_with_threshold": ("comwt", lambda data: center_of_mass_with_threshold(data))
+        "center_of_mass_with_threshold": ("comwt", lambda data: center_of_mass_with_threshold(data)),
+        "circle_fit": ("cf", lambda data: circle_fitting_with_threshold(data))
     }
 
     if methode not in lpc_methods:
@@ -92,7 +93,7 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
 
         bsc = brightness_subarray_creator(array, peaks)
 
-        mean_values = method_function(bsc)[0]
+        mean_values, uncertainties = method_function(bsc)
         lpc_coordinates = lpc_calc(mean_values, peaks)
 
         lpc_output_filename = f"lpc_{os.path.splitext(array_filename)[0]}_{method_abbr}.npy"
