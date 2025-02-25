@@ -12,7 +12,7 @@ Current methods available:
 import numpy as np
 from scipy.spatial import KDTree
 from file_io import save_array_as_npy
-#from gui.gui_main import log_message
+from gui.gui_main import log_message
 
 
 
@@ -70,7 +70,7 @@ def block_average(brightness_array, factor=15):
 
 
 
-def find_peaks(brightness_array, factor=5, threshold=None, window_size=21):
+def find_peaks(brightness_array, factor=10, threshold=None, window_size=9, gui=None):
     """
     Finds the maximum points in a specified subarray and applies a threshold to filter noise.
     Diese Funktion gibt zusätzlich Informationen an die GUI weiter.
@@ -96,8 +96,8 @@ def find_peaks(brightness_array, factor=5, threshold=None, window_size=21):
         threshold = mean_value + (2 * std_dev)
 
         # Ausgabe in die GUI
-        #if gui:
-            #log_message(gui.text_log, f"Threshold automatically calculated as: {threshold}")
+        if gui:
+            log_message(gui.text_log, f"Threshold automatically calculated as: {threshold}")
     
     # Perform block averaging
     data, factor = block_average(brightness_array, factor)
@@ -122,8 +122,14 @@ def find_peaks(brightness_array, factor=5, threshold=None, window_size=21):
                     peaks[peak_count] = [j * factor, i * factor]
                     peak_count += 1
 
+    # Ausgabe von Divisoren in die GUI
+    factor_x = factor  # Du kannst diese Werte nach Bedarf berechnen
+    factor_y = factor  # Hier ebenfalls
+
+    if gui:
+        log_message(gui.text_log, f"Closest divisor used for averaging: factor_x = {factor_x}, factor_y = {factor_y}")
     
-    return peaks[:peak_count]
+    return peaks[:peak_count], threshold
 
 
 

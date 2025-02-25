@@ -9,7 +9,7 @@ from peak_find import find_peaks, combined_filter
 from data_compare import calculate_differences
 
 
-def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=10, threshold=None):
+def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=2, threshold=None):
     """
     Detects and processes peaks from `.npy` files in a batch.
 
@@ -33,9 +33,9 @@ def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=10, thres
         peaks = find_peaks(array, factor=factor, threshold=threshold)
         print(f"Number of peaks found in {filename}: {peaks.shape[0]}")
 
-        if peaks.shape[0] != 257:
-            peaks = combined_filter(peaks)
-            print(f"Number of peaks after filtering: {peaks.shape[0]}")
+        
+        peaks = combined_filter(peaks)
+        print(f"Number of peaks after filtering: {peaks.shape[0]}")
 
         peaks_op_path = os.path.join(output_folder, f"peaks_{os.path.splitext(filename)[0]}.npy")
         np.save(peaks_op_path, peaks)
@@ -46,6 +46,11 @@ def detect_and_verify_peaks_batch(input_folder, filenames=None, factor=10, thres
         create_image_plot(data=array, peaks=peaks, output_path=output_folder, output_filename=plot_filename)
         print(f"Created plot: {plot_filename}")
 
+
+#filenames = (r"peaks_xy_pattern_scale_3.npy")
+
+input_folder = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\noisy_550x550_set1\shifted_noisy\compressed_2"
+#detect_and_verify_peaks_batch(input_folder)
 
 def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
     """
@@ -93,7 +98,7 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
 
         bsc = brightness_subarray_creator(array, peaks)
 
-        mean_values, uncertainties = method_function(bsc)
+        mean_values = method_function(bsc)[0]
         lpc_coordinates = lpc_calc(mean_values, peaks)
 
         lpc_output_filename = f"lpc_{os.path.splitext(array_filename)[0]}_{method_abbr}.npy"
@@ -104,6 +109,12 @@ def calc_lpc_batch(input_folder, methode="center_of_mass", filenames=None):
         plot_filename = f"lpc_{os.path.splitext(array_filename)[0]}_{method_abbr}.png"
         create_image_plot(array, peaks, lpc_coordinates, output_path=method_folder, output_filename=plot_filename)
         print(f"Plot created for LPC coordinates: {plot_filename}")
+
+#calc_lpc_batch(input_folder, methode="center_of_mass")
+#calc_lpc_batch(input_folder, methode="gauss_fit")
+#calc_lpc_batch(input_folder, methode="skewed_gauss_fit")
+#calc_lpc_batch(input_folder, methode="non_linear_center_of_mass")
+#calc_lpc_batch(input_folder, methode="center_of_mass_with_threshold")
 
 
 def combined_plot_all_methods(input_folder):
@@ -281,8 +292,8 @@ def compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames
     Returns:
     - None
     """
-    theoretical_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\simulated_data\simulated_data"
-    theoretical_filename = "projection_rho_0_phi_0_cam1.npy"
+    theoretical_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\sim_dat_large_scale"
+    theoretical_filename = "xy_pattern_scale_1.npy"
 
     output_folder = construct_output_path(input_folder)
     method_folder = os.path.join(output_folder, methode)
@@ -329,6 +340,12 @@ def compare_lpc_to_theoretical(input_folder, methode="center_of_mass", filenames
 
     print(f"Comparison completed. Results saved in: {result_folder}")
 
+#compare_lpc_to_theoretical(input_folder, methode="center_of_mass_with_threshold", plot_type="all")
+#compare_lpc_to_theoretical(input_folder, methode="center_of_mass", plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="gauss_fit", plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="skewed_gauss_fit", plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="non_linear_center_of_mass", plot_type="norm")
+#compare_lpc_to_theoretical(input_folder, methode="center_of_mass_with_threshold", plot_type="norm")
 
 def compare_folders_lpc(input_folder, theoretical_folder=None, scale_factor=5, methode="center_of_mass", filenames=None, abs_values=True, plot_type="norm"):
     """
@@ -496,7 +513,9 @@ def process_comparison_results(input_folder):
             print(f"Comparison results folder not found for method '{method}': {comparison_folder}")
             continue
 
-        _, comparison_arrays = load_all_npy_files(comparison_folder)
+        comparison_files, comparison_arrays = load_all_npy_files(comparison_folder)
+        
+        print(comparison_files)
 
         means = []
         stds = []
@@ -536,3 +555,5 @@ def process_comparison_results_with_plot(input_folder, x_values=None):
 
     plot_means_with_error(results, x_values=x_values, input_folder=input_folder)
     return results
+x_values = [50/10, 50/15, 50/20, 50/25, 50/30, 50/3, 50/40, 50/50, 50/5, 50/6, 50/8]
+process_comparison_results_with_plot(input_folder, x_values=x_values)

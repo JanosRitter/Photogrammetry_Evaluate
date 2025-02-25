@@ -3,10 +3,15 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 import numpy as np
 import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import matplotlib.pyplot as plt
 import cv2
-from peak_find import find_peaks
+from moduls.peak_find import find_peaks
 from file_io import construct_flex_op_path
+
 
 class LaserPointGUI:
     def __init__(self, root):
@@ -302,3 +307,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = LaserPointGUI(root)
     root.mainloop()
+

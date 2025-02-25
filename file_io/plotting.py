@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from file_io.utility import construct_output_path
+from mpl_toolkits.mplot3d import Axes3D
 
 os.chdir('C:/Users/Janos/Documents/Masterarbeit/3D_scanner/Pythoncode')
 
@@ -108,7 +109,10 @@ def create_image_plot(data, peaks=None, mean=None, output_path=None, output_file
         y_min, y_max = peaks[:, 1].min() - buffer, peaks[:, 1].max() + buffer
         plt.xlim(x_min, x_max)
         plt.ylim(y_min, y_max)
-
+    
+    plt.xlim(180, 320)
+    plt.ylim(180, 320)
+    
     plt.legend()
     plt.gca().invert_yaxis()
     plt.xlabel('X-Axis')
@@ -191,15 +195,17 @@ def plot_2d_points_pair(points_2d_1, points_2d_2, title='2D Scatter Plot of Two 
 
 def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
     """
-    Plots 3D points using matplotlib and saves the plot to a specified path.
+    Plots 3D points using matplotlib and returns the Figure object.
 
     Parameters:
-        - points_3d (np.ndarray): A (n, 3) array containing the 3D
-        coordinates of the points (X, Y, Z).
-        - pfad (str): The directory path where the plot will be saved.
+        - points_3d (np.ndarray): A (n, 3) array containing the 3D coordinates (X, Y, Z).
+        - path (str): The directory path where the plot will be saved.
         - dateiname (str): The name of the file to save the plot (default: "3d_plot.png").
+    
+    Returns:
+        - fig (matplotlib.figure.Figure): The figure object containing the 3D plot.
     """
-    fig = plt.figure(figsize=(12, 8))
+    fig = plt.figure(figsize=(6, 6))  # Größe anpassen
     axis = fig.add_subplot(111, projection='3d')
 
     x_coords, y_coords, z_coords = points_3d[:, 0], points_3d[:, 1], points_3d[:, 2]
@@ -211,16 +217,14 @@ def plot_3d_points(points_3d, path=None, dateiname="3d_plot.png"):
     axis.set_zlabel('Z')
     axis.set_title("3D Scatter Plot")
 
-
     if path:
         save_path = os.path.join(path, dateiname)
         os.makedirs(path, exist_ok=True)
         plt.savefig(save_path, format='png', dpi=300, bbox_inches='tight')
         print(f"3D plot saved at: {save_path}")
-    else:
-        plt.show()
 
-    plt.close()
+    plt.close(fig)  # Verhindert, dass sich ein extra Fenster öffnet
+    return fig  # Jetzt wird das Figure-Objekt zurückgegeben
 
 
 

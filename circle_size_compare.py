@@ -1,15 +1,60 @@
-from file_io import *
+import sys
+import os
 from main_compare import detect_and_verify_peaks_batch, calc_lpc_batch
 
-folder_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\Spotsize"
+from file_io import *
+
+folder_path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\input\HD_Spotsize_BZ"
 
 
 #detect_and_verify_peaks_batch(folder_path)
-
+print("done")
 #calc_lpc_batch(folder_path, methode="circle_fit")
 
 import numpy as np
 import os
+
+import os
+import numpy as np
+from PIL import Image
+
+def convert_png_to_npy(folder_path):
+    """
+    Konvertiert alle .png-Bilder in einem Ordner zu .npy-Arrays mit 8-Bit-Grauwerten (0-255).
+
+    Parameter:
+        folder_path (str): Pfad zum Ordner mit den PNG-Dateien.
+
+    Returns:
+        None (die .npy-Dateien werden im selben Ordner gespeichert)
+    """
+    if not os.path.isdir(folder_path):
+        print(f"Der Ordner '{folder_path}' existiert nicht.")
+        return
+    
+    # Alle PNG-Dateien im Ordner finden
+    png_files = [f for f in os.listdir(folder_path) if f.endswith('.png')]
+
+    if not png_files:
+        print("Keine PNG-Dateien im Ordner gefunden.")
+        return
+
+    for file_name in png_files:
+        file_path = os.path.join(folder_path, file_name)
+
+        # Bild als Graustufen laden (8 Bit pro Pixel)
+        image = Image.open(file_path).convert("L")
+        image_array = np.array(image, dtype=np.uint8)  # Sicherstellen, dass es ein 8-Bit-Array ist
+
+        # Speichern als .npy-Datei
+        npy_file_path = os.path.join(folder_path, file_name.replace(".png", ".npy"))
+        np.save(npy_file_path, image_array)
+
+        print(f"Konvertiert: {file_name} → {file_name.replace('.png', '.npy')} (Shape: {image_array.shape})")
+
+    print("Konvertierung abgeschlossen.")
+
+convert_png_to_npy(folder_path)
 
 def filter_npy_by_range_and_points(folder_path, file_name, xlim=None, ylim=None, points_to_remove=None):
     """
@@ -72,7 +117,7 @@ def filter_npy_by_range_and_points(folder_path, file_name, xlim=None, ylim=None,
     total_removed = removed_outside_bounds + removed_specific_points
 
     # Save the filtered data, overwriting the original file
-    np.save(file_path, filtered_data)
+    #np.save(file_path, filtered_data)
 
     # Print statistics
     print(f"Original number of points: {initial_count}")
@@ -86,7 +131,7 @@ def filter_npy_by_range_and_points(folder_path, file_name, xlim=None, ylim=None,
 #path = r"C:\Users\Janos\Documents\Masterarbeit\3D_scanner\input_output\output\Spotsize" 
 #file_name = r"peaks_tcam-capture-13320612-aravis-GRAY8_2048x1536_11m.npy"  
 
-#filter_npy_by_range_and_points(path, file_name, xlim=(250,1600), ylim=None, points_to_remove=np.array([[500, 520], [1150, 450]]))
+#filter_npy_by_range_and_points(path, file_name)
     
 def calc_lpc_circle_fitting(input_folder, thresholds, filenames=None):
     """
@@ -147,7 +192,7 @@ def calc_lpc_circle_fitting(input_folder, thresholds, filenames=None):
             print(f"Plot created for LPC coordinates: {plot_filename}")
 
 
-#calc_lpc_circle_fitting(folder_path, thresholds= [60,80,100,120,140,160,180,200])
+calc_lpc_circle_fitting(folder_path, thresholds= [60,80,100,120,140,160,180,200])
             
 import os
 import numpy as np
@@ -255,4 +300,4 @@ def plot_radius_vs_threshold(input_folder, x_values):
 
     
     
-plot_radius_vs_threshold(folder_path, x_values=[5, 6, 7, 8, 9, 10, 11])
+plot_radius_vs_threshold(folder_path, x_values=[16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31])

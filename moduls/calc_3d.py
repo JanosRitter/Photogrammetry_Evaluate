@@ -4,6 +4,7 @@ and resolution to convert pixel coordinates to real-world ones and then compute 
 """
 
 import numpy as np
+from file_io import load_calibration
 
 
 def calculate_angles(indices):
@@ -40,7 +41,7 @@ def calculate_angles(indices):
     return angles_x, angles_y
 
 
-def triangulate_3d(camera1_data, camera2_data, camera_stats, calibration_file=None):
+def triangulate_3d(camera1_data, camera2_data, calibration_id=None):
     """
     Calculates the 3D coordinates of points based on image data from two cameras.
     This function uses the pixel coordinates from two different cameras and the camera parameters
@@ -60,31 +61,31 @@ def triangulate_3d(camera1_data, camera2_data, camera_stats, calibration_file=No
         - np.ndarray: Array of reconstructed 3D coordinates (n, 3)
           where each row represents a point in 3D space.
     """
-    focal_length = camera_stats['f']
-    pixel_size = camera_stats['pixel_size']
-    resolution = camera_stats['resolution']
+    focal_length = 0.04
+    pixel_size = 2.74 * 10**(-6)
+    resolution = (3000, 4096)
 
     n_points = camera1_data.shape[0]
     points_3d = np.zeros((n_points, 3))
 
-    # Define default translation vector and rotation matrix for the second camera
-    default_translation = np.array([0.4, 0, 0])  # Default translation in meters
-    default_rotation = np.eye(3)  # Default rotation matrix (identity matrix)
+    # Standardwerte für Rotation und Translation
+    translation_vector = np.array([0.4, 0, 0])
+    rotation_matrix = np.eye(3)
 
-    if calibration_file is not None:
-        # Load translation vector and rotation matrix from calibration file
-        calibration_data = np.load(calibration_file)
-        translation_vector = calibration_data['translation']
-        rotation_matrix = calibration_data['rotation']
-    else:
-        translation_vector = default_translation
-        rotation_matrix = default_rotation
+    # Kalibrierung laden, falls angegeben
+    if calibration_id is not None:
+        calibration_data = load_calibration(calibration_id)
+        if calibration_data:
+            translation_vector = calibration_data["T"]
+            rotation_matrix = calibration_data["R"]
+        else:
+            print("Fehler beim Laden der Kalibrierung. Verwende Standardwerte.")
 
-    # Define camera positions
-    cam1_pos = np.array([0, 0, 0])  # First camera at the origin
-    cam2_pos = translation_vector  # Second camera position from calibration
+    # Kamera-Positionen
+    cam1_pos = np.array([0, 0, 0])
+    cam2_pos = translation_vector
 
-    # Apply rotation to second camera's direction vectors
+    # Offset für Bildmitte
     offset_x = resolution[0] / 2
     offset_y = resolution[1] / 2
 
@@ -96,7 +97,7 @@ def triangulate_3d(camera1_data, camera2_data, camera_stats, calibration_file=No
 
         dir_cam1 = np.array([x1_img, y1_img, focal_length])
         dir_cam2 = np.array([x2_img, y2_img, focal_length])
-        dir_cam2 = rotation_matrix @ dir_cam2  # Rotate direction vector of the second camera
+        dir_cam2 = rotation_matrix @ dir_cam2
 
         points_3d[i] = find_closest_point(cam1_pos, dir_cam1, cam2_pos, dir_cam2)
 

@@ -170,4 +170,39 @@ def transpose_with_padding(array):
     )
 
     return padded_array
-        
+
+
+def load_calibration(calibration_id, base_path="base_path/calibration/calibration_files"):
+    """
+    Sucht eine .npz-Kalibrierungsdatei im angegebenen Kalibrierungsordner und lädt die Daten.
+
+    Parameter:
+        calibration_id (str): Name des Kalibrierungsordners (z. B. "calibration_1").
+        base_path (str): Basisverzeichnis der Kalibrierungsdateien.
+
+    Rückgabewert:
+        dict: Enthält 'R' (Rotationsmatrix) und 'T' (Translationsvektor), falls erfolgreich geladen.
+        None: Falls keine Datei gefunden oder ein Fehler aufgetreten ist.
+    """
+    calibration_folder = os.path.join(base_path, calibration_id)
+
+    if not os.path.exists(calibration_folder) or not os.path.isdir(calibration_folder):
+        print(f"Kalibrierungsordner {calibration_folder} existiert nicht.")
+        return None
+
+    # Suche nach einer .npz-Datei
+    npz_files = [f for f in os.listdir(calibration_folder) if f.endswith(".npz")]
+
+    if not npz_files:
+        print(f"Keine .npz-Datei in {calibration_folder} gefunden.")
+        return None
+
+    calibration_file = os.path.join(calibration_folder, npz_files[0])  # Erste .npz-Datei nehmen
+    print(f"Lade Kalibrierungsdatei: {calibration_file}")
+
+    try:
+        data = np.load(calibration_file)
+        return {"R": data["R"], "T": data["T"]}
+    except Exception as e:
+        print(f"Fehler beim Laden der Kalibrierungsdatei: {e}")
+        return None
